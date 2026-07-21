@@ -43,61 +43,28 @@ scan_svg_hidden() {
   return 0
 }
 
-# TSX 硬寫中文檢查:先剝除三種註解(// 行註解、/* */ 區塊含跨行、{/* */} JSX)再驗中文,
-# 徹底避免行首/行尾 JSX 註解誤報(perl \p{Han} 精準比對,macOS 內建)
-scan_tsx_chinese() {
-  local files hits n
-  files=$(find "$ROOT" -name '*.tsx' -not -path '*/node_modules/*' 2>/dev/null)
-  [ -z "$files" ] && return 0
-  hits=$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 perl -Mutf8 -CSD -ne '
-    my $orig=$_;
-    if ($inblock) { if (s{.*?\*/}{}) { $inblock=0 } else { $orig="" } }
-    if ($orig ne "") {
-      s{\{?/\*.*?\*/}{}g;
-      if (s{\{?/\*.*}{}) { $inblock=1 }
-      s{//.*}{};
-      if (/\p{Han}/) { print "$ARGV:$.:$orig" }
-    }
-    if (eof) { close(ARGV); $inblock=0 }
-  ' 2>/dev/null || true)
-  [ -z "$hits" ] && return 0
-  n=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
-  printf '\n[ERROR] %s(%s 處)\n' "硬寫中文(顯示文字須 t(key);所有註解已排除)" "$n"
-  printf '%s\n' "$hits" | head -12 | sed 's/^/  /'
-  [ "$n" -gt 12 ] && echo "  …其餘 $((n-12)) 處省略"
-  err=$((err+n))
-  return 0
-}
-
 echo "═══ antd-verify $(date '+%Y-%m-%d %H:%M') ═══"
 echo "目標: $ROOT"
 
-# ---- 模式偵測:靜態(index.html) / TSX(*.tsx),可並存 ----
-has_static=0; has_tsx=0
-[ -f "$ROOT/index.html" ] && has_static=1
-[ -n "$(find "$ROOT" -name '*.tsx' -not -path '*/node_modules/*' 2>/dev/null | head -1)" ] && has_tsx=1
-if [ $has_static -eq 0 ] && [ $has_tsx -eq 0 ]; then
-  echo "✗ 資料夾內沒有 index.html 也沒有 .tsx,無可驗證目標"; exit 2
+# ---- 須有 index.html 才可驗證 ----
+if [ ! -f "$ROOT/index.html" ]; then
+  echo "✗ 資料夾內沒有 index.html,無可驗證目標"; exit 2
 fi
 
-# ---- 靜態模式:結構檢查(antd-static-layout 第1節) ----
-if [ $has_static -eq 1 ]; then
-  for f in css/antd.css css/base.css; do
-    if [ ! -f "$ROOT/$f" ]; then echo "[ERROR] 缺少 $f(標準結構,見 antd-static-layout 第1節)"; err=$((err+1)); fi
-  done
-fi
+# ---- 結構檢查(antd-static-layout 第1節) ----
+for f in css/antd.css css/base.css; do
+  if [ ! -f "$ROOT/$f" ]; then echo "[ERROR] 缺少 $f(標準結構,見 antd-static-layout 第1節)"; err=$((err+1)); fi
+done
 
 # ---- head 載入順序:Tailwind CDN → antd.css → base.css(第2節) ----
-if [ -f "$ROOT/index.html" ]; then
-  t=$(grep -n 'cdn\.tailwindcss\.com' "$ROOT/index.html" | head -1 | cut -d: -f1)
-  a=$(grep -n 'css/antd\.css' "$ROOT/index.html" | head -1 | cut -d: -f1)
-  b=$(grep -n 'css/base\.css' "$ROOT/index.html" | head -1 | cut -d: -f1)
-  if [ -n "$t" ] && [ -n "$a" ] && [ -n "$b" ]; then
-    if [ "$t" -lt "$a" ] && [ "$a" -lt "$b" ]; then :; else
-      echo "[ERROR] head 載入順序錯誤(須 Tailwind CDN → antd.css → base.css;目前行號 $t/$a/$b)"; err=$((err+1)); fi
-  else
-    echo "[WARN] index.html 未同時找到 Tailwind CDN / antd.css / base.css 引用,無法檢查順序"; warn=$((warn+1))
-  fi
+t=$(grep -n 'cdn\.tailwindcss\.com' "$ROOT/index.html" | head -1 | cut -d: -f1)
+a=$(grep -n 'css/antd\.css' "$ROOT/index.html" | head -1 | cut -d: -f1)
+b=$(grep -n 'css/base\.css' "$ROOT/index.html" | head -1 | cut -d: -f1)
+if [ -n "$t" ] && [ -n "$a" ] && [ -n "$b" ]; then
+  if [ "$t" -lt "$a" ] && [ "$a" -lt "$b" ]; then :; else
+    echo "[ERROR] head 載入順序錯誤(須 Tailwind CDN → antd.css → base.css;目前行號 $t/$a/$b)"; err=$((err+1)); fi
+else
+  echo "[WARN] index.html 未同時找到 Tailwind CDN / antd.css / base.css 引用,無法檢查順序"; warn=$((warn+1))
 fi
 
 # ---- 內容檢查 ----
@@ -110,24 +77,12 @@ scan ERROR "Tailwind 圓角/陰影 class(元件外觀由 antd.css 負責)" "(^|[
 scan WARN "HTML 內硬編碼色值(顏色應集中於 css 檔)" '#[0-9a-fA-F]{6}' '*.html'
 scan WARN "Tailwind 字級/字重 class(元件文字由 antd.css 負責,版面標籤可例外)" "(^|[\"' :])(text-(xs|sm|base|lg|xl|2xl)|font-(thin|light|normal|medium|semibold|bold|black))([\"' ]|\$)" '*.html'
 scan WARN "圖片未用 images/ 相對路徑" '<img[^>]*src=' '*.html' 'src="(images/|http|data:)'
-scan WARN "window.open(「彈窗」一律頁內 Modal,獨立視窗做法已推翻;見 decisions.md 2026-07-15)" 'window\.open[[:space:]]*\(' '*.js'
+scan WARN "window.open(「彈窗」一律頁內 Modal,獨立視窗做法已推翻;見 antd-proto-interactions §3/§7)" 'window\.open[[:space:]]*\(' '*.js'
 scan_svg_hidden
-
-# ---- TSX 模式(antd-tsx-prototype / FD 規範) ----
-if [ $has_tsx -eq 1 ]; then
-  scan ERROR "antd v4 visible prop(v5 改用 open)" 'visible=' '*.tsx'
-  scan ERROR "moment 禁用(改 dayjs)" "from ['\"]moment|require\(['\"]moment" '*.tsx'
-  scan ERROR "ProComponents 禁用(僅 antd 基礎元件)" 'Pro(Table|Form|Layout|Card|Descriptions)' '*.tsx'
-  scan ERROR "@ant-design/icons 禁用(只用 react-icons)" '@ant-design/icons' '*.tsx'
-  scan ERROR "TypeScript any 禁用(型別需完整)" '(:[[:space:]]*any([^a-zA-Z]|$)|as[[:space:]]+any([^a-zA-Z]|$)|<any>)' '*.tsx'
-  scan_tsx_chinese
-  scan WARN "hex 色碼(顏色應走 ConfigProvider token;FD 5 色 token 值已排除)" '#[0-9a-fA-F]{3,8}' '*.tsx' '#(1677ff|52c41a|faad14|ff4d4f|d9d9d9)'
-fi
 
 echo
 echo "── 結果: ERROR $err 處 / WARN $warn 處 ──"
-[ $has_static -eq 1 ] && echo "ℹ 靜態人工覆核:元件註解(名稱+關鍵props)齊全、DOM 對應 antd5 實際結構、彈出層位於 </body> 前、本輪僅動對應區塊檔案"
-[ $has_tsx -eq 1 ] && echo "ℹ TSX 人工覆核:index.tsx 無業務邏輯(Controller 分離)、types.ts 型別完整、i18n key 對照表已附、共用元件沿用已標註"
+echo "ℹ 靜態人工覆核:元件註解(名稱+關鍵props)齊全、DOM 對應 antd5 實際結構、彈出層位於 </body> 前、本輪僅動對應區塊檔案"
 if [ $err -gt 0 ]; then echo "✗ 未通過:ERROR 必須修正後重跑"; exit 1; fi
 if [ $warn -gt 0 ]; then echo "△ 無 ERROR;WARN 請逐項確認"; exit 0; fi
 echo "✓ 通過"; exit 0

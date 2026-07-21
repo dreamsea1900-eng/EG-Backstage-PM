@@ -2,47 +2,43 @@
 
 ## 這是什麼
 
-這份 repo 是「EG站後台」專案給 **PM 自行使用** 的 prototype 產出工具。
-用 Claude Code＋這裡的規範，PM 可以直接把自己的規格文件／wireframe 轉成
-符合設計規範的靜態 HTML prototype 初稿，不需要每次都等設計師手動切版。
+這份 kit 讓 PM 用 Claude Code，把自己的流程圖＋規格文件直接轉成
+符合 EG站後台設計規範的靜態 HTML prototype 初稿——零 React、零建置、零安裝。
+產出後交設計師 review，通過才納入正式專案並轉 Figma（轉 Figma 由設計師處理）。
 
-## 工作流程
+## 主流程
 
-1. **準備規格**：整理好的規格文件（流程、狀態模型、驗收條件等）
-2. **產出 prototype**：貼上規格即視為執行授權，建議用 `/spec-to-proto` command
-   （規則：先讀 `doc/decisions.md`→ 解析規格 → 建頁面資料夾 → 切版與互動 → 驗證 → 交付摘要）
-3. **多輪修改**：同一頁面有後續調整意見時，用 `/revise` command
-4. **驗證**：每輪產出／修改後執行 `antd-verify`（靜態模式），跑到 0 ERROR
-5. **交回設計師 review**：完成後把這個 repo 的異動（或 diff／PR）交給設計師，
-   **設計師 review 通過後才會被納入正式專案**（`EG站後台`），繼續走轉 Figma 設計稿的流程；
-   **這一步由設計師執行，PM 不需要處理 Figma**
+1. **準備規格文件**：把流程圖與規格整理成一份文字文檔（見「如何準備規格」）
+2. **產出 prototype**：貼上規格即視為執行授權，依 `/spec-to-proto` 流程
+   （解析規格 → 建頁面資料夾 → 切版與互動 → 驗證 → 交付摘要）
+3. **多輪修改**：同一頁面後續調整，依 `/revise` 流程
+4. **每輪驗證**：改完跑 `antd-verify`（靜態），到 0 ERROR
+5. **交回設計師 review**：通過後才納入正式專案；轉 Figma 由設計師執行，PM 不碰
+
+## 如何準備規格
+
+- 用【規格】／【建議】標記分流：【規格】＝必守的硬需求；【建議】＝可依規範取捨
+- 描述清楚 user flow 的狀態與分支（含邊界情境：空狀態、錯誤、載入中）
+- 未定的文案／API／常數就直說「待定」，Claude 會留 `TODO` 不臆測
+- **流程圖可以直接放圖**：把截圖丟進資料夾請 Claude 讀圖，或用文字把流程描述進規格
+
+## 產出規範（固定）
+
+- 純 HTML／CSS／JS 靜態頁面，零 React、不建置打包；Ant Design 5 樣式已抽好、直接套
+- 需要非 antd 的第三方庫（圖表、地圖等）以 CDN 引入並鎖版本
+- 規格未定義的文案／API／常數一律留 `TODO`，不臆測
+- 詳細切版規則見 `.claude/skills/antd-static-layout`，互動與 mock 見 `antd-proto-interactions`
 
 ## 資料夾結構
 
 | 資料夾 | 用途 |
 |---|---|
-| `<頁面名>/` | 每個頁面／需求一個獨立資料夾，內部結構依 `antd-static-layout` 第 1 節（`index.html` ＋ `css/` ＋ `js/` ＋ `images/`） |
-| `doc/decisions.md` | PM 端修正沉澱記錄；跟正式專案的 `decisions.md` 是分開的兩份，設計師 review 時會視需要把有價值的規則摘要採納回正式專案 |
-| `.claude/skills/` | `antd-static-layout`（靜態切版規範）、`antd-proto-interactions`（互動與 mock 慣例）、`antd-verify`（驗證，靜態模式） |
-| `.claude/commands/` | `/spec-to-proto`（規格開工儀式）、`/revise`（多輪修改儀式） |
-
-## 產出規範（固定）
-
-- **零 React**：純 HTML／CSS／JS 靜態頁面，不建置打包環境；Ant Design 5 樣式抽出後套用，
-  需要非 antd 的第三方庫（圖表、地圖等）時以 CDN 引入並鎖版本
-- **不用寫 TSX、不用交付 FD**——這份 kit 的產出物終點就是靜態 HTML prototype，
-  後續轉 Figma 由設計師在正式專案處理
-- 規格未定義的文案／API／常數一律留 `TODO` 註記，不要自己臆測
-
-## 迭代沉澱規則
-
-- 每次開工前先讀 `doc/decisions.md`——已沉澱的規則直接遵循
-- 每輪修改處理完，判斷哪些屬於「通則」，追加至 `doc/decisions.md`
-- 這份 `decisions.md` 只在這個 PM repo 內累積，不會自動同步回正式專案，
-  設計師 review 時會人工判斷要不要採納
+| `<頁面名>/` | 每個頁面一個資料夾，內部結構依 `antd-static-layout` 第 1 節（`index.html`＋`css/`＋`js/`＋`images/`） |
+| `.claude/skills/` | `antd-static-layout`（切版）、`antd-proto-interactions`（互動與 mock）、`antd-verify`（驗證） |
+| `.claude/commands/` | `/spec-to-proto`（開工儀式）、`/revise`（多輪修改儀式） |
 
 ## 環境需求
 
-- Node.js（跑 `antd-verify` 驗證腳本與 `antd-static-layout` 的 `extract.mjs` 需要）
-- 進資料夾後先 `npm install`
-- 不需要 Figma MCP、不需要任何建置工具
+- Claude Code
+- Node.js（僅用於 `node --check` 檢查 JS 語法；驗證腳本 `verify.sh` 是純 bash）
+- **不需要 `npm install`、不需要任何建置工具、不需要 Figma**

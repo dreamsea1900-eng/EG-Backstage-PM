@@ -6,7 +6,6 @@ description: EG站後台靜態 prototype 的互動與 mock 慣例（demo 狀態�
 # AntD Prototype 互動慣例（EG站後台）
 
 定位：`antd-static-layout` 管切版（DOM／CSS／拆檔），本 skill 管**互動與 mock**。
-本 skill 是 `doc/decisions.md` 互動類通則的回寫落腳處。
 最終出口是 Figma 設計稿：**demo 專用的頁面、控制項、區塊一律在註解標記「轉 Figma 時忽略」**。
 
 **模板（省 token，優先複製再改，不重新生成）**：`assets/` 內含

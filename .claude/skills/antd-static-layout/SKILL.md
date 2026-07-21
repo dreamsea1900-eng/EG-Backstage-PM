@@ -126,11 +126,7 @@ tailwind.config = {
 
 - 不確定某元件的 DOM 結構時,以 antd 5 官方文件示範的實際渲染結果為準,
   寧可查證也不要憑印象自創。
-- SVG 圖示直接內嵌,並於註解標對應的 react-icons 名稱(FD 端只用 react-icons v5、
-  禁 @ant-design/icons,標好名稱轉 TSX 才接得上):`<!-- icon: FiSearch (react-icons/fi) -->`
-- 情境符合 FD 既有共用元件(清單:`.claude/skills/antd-tsx-prototype/data/shared-components.md`)時,
-  元件註解改標共用元件名:`<!-- 共用元件: GameSelector -->`;FD 會以現成元件銜接,
-  視覺模擬即可,不必精刻其內部結構。
+- SVG 圖示直接內嵌,並於註解標對應的 react-icons 名稱(標好名稱,設計師接續時才對得上):`<!-- icon: FiSearch (react-icons/fi) -->`
 
 ## 5. 彈出類元件的注意事項
 
@@ -143,22 +139,10 @@ body 的 portal。靜態版做法:
 - 彈出定位不會像真 antd 自動計算,固定版位即可;這是靜態切版的已知取捨。
 - 鍵盤操作與 aria 屬性不會自動存在,若使用者要求無障礙,需在 JS 中補上。
 
-## 6. 重抽樣式 / 更換主題(需要時才做)
+## 6. antd.css 由設計師維護
 
-> ⚠ 本專案主題**維持 antd v5 預設**(primary #1677ff 等,FD 規範要求與現有系統一致),
-> 不要為個別頁面改主題;未來若整體品牌化,先與 FD 對齊再重抽。
-
-只有兩種情況需要跑 `scripts/extract.mjs`:antd 要升版,或(與 FD 對齊後)要改主題
-(如品牌色)。做法:
-
-```bash
-cd scripts
-npm install
-node extract.mjs ../assets/antd.css
-```
-
-改主題:編輯 extract.mjs 內 `theme.token`(例 `colorPrimary`)後重跑。
-腳本已處理 hash 關閉與黑名單元件補渲染,勿刪除相關段落。
+`css/antd.css` 是預先抽取好的 antd 5 靜態樣式,PM 端**直接複製使用、不需重抽**。
+antd 升版或改主題色屬設計師維護範圍,PM 不處理(主題維持 antd v5 預設,primary #1677ff)。
 
 ## 7. 修改原則
 
