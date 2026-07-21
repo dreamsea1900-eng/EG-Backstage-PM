@@ -1,0 +1,22 @@
+/* 【模板】toast 樣式(antd-proto-interactions §6):複製到頁面 css/toast.css,xxx 改頁面前綴 */
+/* Toast 顯示位置(靜態版簡化:固定頂部置中) */
+.xxx-toast {
+  display: none;
+  position: fixed;
+  top: 24px;
+  left: 0;
+  right: 0;
+  z-index: 2010;
+  text-align: center;
+  pointer-events: none;
+}
+
+.xxx-toast.xxx-toast-show {
+  display: block;
+}
+
+/* icon 與文字間距(antd message 慣例) */
+.xxx-toast-icon {
+  margin-right: 8px;
+  vertical-align: -0.185em;
+}

@@ -1,0 +1,40 @@
+<!-- 【模板】demo 分支模擬 Radio 區(antd-proto-interactions §4)
+     使用方式:複製到設計內容之後(頁面或 Modal body 內),xxx 前綴改頁面前綴、選項依分支改;
+     搭配 assets/demo-radio.js 的 checked class 同步邏輯 -->
+
+<!-- Demo 控制(prototype 專用,非設計稿內容,轉 Figma 時忽略):選擇模擬結果 -->
+<div class="xxx-demo">
+  <span class="xxx-demo-title">Demo：模擬TODO結果</span>
+  <!-- Radio.Group: 模擬結果(js 切換 checked class) -->
+  <div class="flex flex-col gap-2" id="xxxDemoGroup">
+    <label class="ant-radio-wrapper ant-radio-wrapper-checked">
+      <span class="ant-radio ant-radio-checked">
+        <input type="radio" class="ant-radio-input" name="xxxResult" value="success" checked>
+        <span class="ant-radio-inner"></span>
+      </span>
+      <span>TODO: 成功分支</span>
+    </label>
+    <label class="ant-radio-wrapper">
+      <span class="ant-radio">
+        <input type="radio" class="ant-radio-input" name="xxxResult" value="error">
+        <span class="ant-radio-inner"></span>
+      </span>
+      <span>TODO: 錯誤分支</span>
+    </label>
+  </div>
+</div>
+
+<!-- 配套 css(併入 demo 區所屬區塊的 css 檔):
+.xxx-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(5, 5, 5, 0.06);
+}
+
+.xxx-demo-title {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+-->

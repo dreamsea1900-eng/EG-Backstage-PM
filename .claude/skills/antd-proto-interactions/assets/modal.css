@@ -1,0 +1,21 @@
+/* 【模板】頁內 Modal 樣式(antd-proto-interactions §3):複製到頁面 css/modal.css,xxx 改頁面前綴 */
+/* 開關以 class 切換(不用 inline style,JS 亦不操作 .style) */
+.xxx-modal {
+  display: none;
+}
+
+.xxx-modal.xxx-modal-open {
+  display: block;
+}
+
+/* 寬度依版型調整(表單類慣例 520、單欄選項/置中版型 400–420),置中偏上(antd 預設 top:100px) */
+.xxx-modal .ant-modal {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  top: 100px;
+  margin: 0 auto;
+}
+
+.xxx-modal .ant-modal-body {
+  padding-top: 16px;
+}

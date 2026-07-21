@@ -1,0 +1,15 @@
+{
+  "name": "antd-static-style-extractor",
+  "private": true,
+  "type": "module",
+  "description": "一次性工具:抽取 Ant Design 5 全元件靜態 CSS(關閉 hash),供純 HTML 專案使用",
+  "scripts": {
+    "extract": "node extract.mjs ../assets/antd.css"
+  },
+  "dependencies": {
+    "@ant-design/static-style-extract": "^1.0.2",
+    "antd": "^5.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
