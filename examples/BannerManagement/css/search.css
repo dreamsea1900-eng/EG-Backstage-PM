@@ -1,0 +1,33 @@
+/* 搜尋條件區 */
+.bm-search .ant-card-body {
+  padding: 16px;
+}
+
+.bm-search-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(240px, 1.4fr) minmax(180px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.bm-search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bm-search-label {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.bm-filter-range {
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  .bm-search-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

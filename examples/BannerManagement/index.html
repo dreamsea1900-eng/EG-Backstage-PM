@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>版面設定 · Banner 管理 — 靜態切版</title>
+<!--
+  版面設定 → Banner 管理（靜態 prototype）
+  規格來源：「Banner 管理 — Claude Code 實作文件（整合版 v3）」banner-management-claude-code.md（2026-07-17）
+  版面參考：banner-wireframes.html §A/§B/§C；協作慣例：working-agreement.md
+
+  範圍：Part A 列表頁、Part B 新增彈窗、Part C 排序流程（編輯／刪除細部流程待後續規格）。
+
+  流程摘要：
+  - 列表：四版位（首頁大／首頁小／登入／註冊）共用同一套搜尋與列表結構，各一組 tbody 預寫、JS 切換（規格 A1）
+  - 搜尋：狀態＋顯示期間＋名稱 AND 過濾；名稱模糊不分大小寫、即時擋 emoji；期間限 3 個月（規格 A4）
+  - 新增：彈窗左標籤橫式表單；驗證失敗 inline 紅字保留彈窗；成功 → Toast「新增成功」＋排第 1 順位＋關閉並刷新（規格 B）
+  - 排序：進入排序模式押灰鎖定（輪播間隔／Switch／編輯／刪除），排序／新增原位換取消／儲存，
+    拖曳調整順序；取消回復原順序；儲存成功更新順位離開、失敗停留；
+    站內離開行為觸發「尚未儲存」提示（僅順序有異動時），瀏覽器離開走原生 beforeunload（規格 C）
+
+  Demo（皆註記「轉 Figma 時忽略」）：
+  - 頁尾：排序儲存結果模擬（成功／失敗）＋重設 Demo 資料
+  - 彈窗內：上傳結果模擬（點擊即成功／尺寸不符／大小不符／實際選檔驗證）＋可選活動清單（有資料／無資料）
+  - demo 狀態僅輪播間隔存 localStorage("egBannerManagement.demo")；列表異動不持久化（重整即還原 mock，
+    避免動態建 DOM，對齊 antd-proto-interactions §2 預寫 DOM 原則）
+
+  TODO／待確認（不臆測，規格 D3 編號對應）：
+  - 驗證提示文案均為流程圖草案，正式以 i18n 定稿為準（規格 B5 註）
+  - 編輯／刪除流程待後續規格：按鈕暫以 warning toast 提示（規格 v3 文件範圍）
+  - 內部連結站內網域驗證深度未定（D3-2）：僅驗 http(s):// 開頭
+  - 取消勾選「套用活動廣告時間」＝解除鎖定、保留最後帶入值（D3-3 暫採規格建議）
+  - 「沒有符合顯示時間的活動」文案是否更名（D3-4）：暫依規格草案文案
+  - 排序離開提示僅在「順序有異動且未儲存」時觸發（D3-7 暫採規格建議）
+  - 圖片尺寸四版位共用 1920×450／840×350／375×240（D3-8 暫依共用）
+  - 「顯示時間不符合活動廣告時間」的「不符」判定規格未明定：暫採「顯示時間需落在活動廣告時間範圍內」
+  - 套用活動廣告時間鎖定時跳過「開始不可早於現在」驗證（進行中活動套用必為過去時間，規格衝突待確認）
+  - 輪播間隔數值範圍與儲存時機未定義：暫 1–60、變更即存 demo 狀態（TODO: 對接 GET/PUT /api/admin/banners/carousel）
+  - 搜尋「顯示期間」比對語意未定義：暫採「與 Banner 顯示期間有交集」
+  - 新增成功後「刷新列表」暫實作為重設搜尋回預設視圖
+  - 日期欄位以文字輸入模擬（無日曆彈層）；轉 Figma 時以 antd (Range)Picker 元件呈現
+  - emoji 阻擋範圍暫以 Unicode Extended_Pictographic 判定
+  - 拖曳排序僅支援滑鼠（鍵盤上下移動為規格建議加分項，未實作）
+-->
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="js/tailwind-config.js"></script>
+<link rel="stylesheet" href="css/antd.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/select.css">
+<link rel="stylesheet" href="css/search.css">
+<link rel="stylesheet" href="css/toolbar.css">
+<link rel="stylesheet" href="css/table.css">
+<link rel="stylesheet" href="css/modal.css">
+<link rel="stylesheet" href="css/toast.css">
+<link rel="stylesheet" href="css/demo.css">
+</head>
+<body>
+
+<!-- Layout: 全站框架（頂欄＋左側全域導覽＋主內容，規格 D2） -->
+<section class="ant-layout bm-shell">
+
+  <!-- Layout.Header: 全站頂欄（淺色後台樣式；wireframe §A 頂列） -->
+  <header class="ant-layout-header bm-header">
+    <div class="flex items-center gap-2">
+      <!-- Button type="text": 側欄收合鈕（非本規格範圍，靜態示意）icon: FiMenu (react-icons/fi) -->
+      <button type="button" class="ant-btn ant-btn-color-default ant-btn-variant-text ant-btn-icon-only" aria-label="收合選單">
+        <span class="ant-btn-icon"><span class="anticon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></span></span>
+      </button>
+      <span class="bm-logo">BOTAN</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <!-- Dropdown: 時區切換（非本規格範圍，靜態示意）icon: FiChevronDown (react-icons/fi) -->
+      <span class="bm-header-item">UTC+7
+        <span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+      </span>
+      <span class="bm-header-item flex items-center gap-2">
+        <!-- Avatar size=28 icon: FiUser (react-icons/fi) -->
+        <span class="ant-avatar ant-avatar-circle ant-avatar-icon bm-header-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
+        admin03
+      </span>
+      <!-- Button type="link": 登出（非本規格範圍，靜態示意） -->
+      <button type="button" class="ant-btn ant-btn-color-link ant-btn-variant-link"><span>登出</span></button>
+    </div>
+  </header>
+
+  <section class="ant-layout ant-layout-has-sider bm-body">
+
+    <!-- Layout.Sider theme="light" width=208：全域側欄（antd.css 未含 Sider 樣式，以 bm-sider 自訂容器模擬；選單項目為全站示意，非本規格範圍） -->
+    <aside class="bm-sider">
+      <!-- Menu mode="inline" openKeys=['site'] selectedKeys=['layout-settings'] -->
+      <ul class="ant-menu ant-menu-root ant-menu-inline ant-menu-light bm-sider-menu" role="menu">
+        <li class="ant-menu-item" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">概要</span></li>
+        <li class="ant-menu-submenu ant-menu-submenu-inline ant-menu-submenu-open" role="none">
+          <div class="ant-menu-submenu-title" role="menuitem" data-guard="nav" aria-expanded="true">
+            <span class="ant-menu-title-content">站點管理</span>
+            <i class="ant-menu-submenu-arrow"></i>
+          </div>
+          <ul class="ant-menu ant-menu-sub ant-menu-inline" role="menu">
+            <li class="ant-menu-item" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">通知中心</span></li>
+            <li class="ant-menu-item" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">推播管理</span></li>
+            <li class="ant-menu-item" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">前台遊戲管理</span></li>
+            <li class="ant-menu-item" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">Promo Code</span></li>
+            <li class="ant-menu-item ant-menu-item-selected" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">版面設定</span></li>
+          </ul>
+        </li>
+        <li class="ant-menu-item" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">遊戲管理</span></li>
+        <li class="ant-menu-item" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">活動管理</span></li>
+        <li class="ant-menu-item" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">用戶</span></li>
+        <li class="ant-menu-item" role="menuitem" data-guard="nav"><span class="ant-menu-title-content">金流中心</span></li>
+      </ul>
+    </aside>
+
+    <!-- Layout.Content: 主內容區 -->
+    <main class="ant-layout-content bm-content">
+
+      <!-- Typography.Title level=4: 頁面標題 -->
+      <h4 class="ant-typography bm-page-title">版面設定</h4>
+
+      <!-- Tabs activeKey="banner" items=[{key:'banner',label:'Banner'}]（未來可能擴充其他 Tab，規格 A1） -->
+      <div class="ant-tabs ant-tabs-top bm-tabs">
+        <div class="ant-tabs-nav">
+          <div class="ant-tabs-nav-wrap">
+            <div class="ant-tabs-nav-list">
+              <div class="ant-tabs-tab ant-tabs-tab-active">
+                <div class="ant-tabs-tab-btn" role="tab" aria-selected="true">Banner</div>
+              </div>
+              <div class="ant-tabs-ink-bar ant-tabs-ink-bar-animated"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-start gap-4 bm-main-row">
+
+        <!-- Menu mode="inline": Banner 版位子選單（四版位共用同一套搜尋與列表結構，以 position 切換資料，規格 A1；排序模式中點擊觸發離開提示，規格 C6） -->
+        <div class="bm-submenu">
+          <ul class="ant-menu ant-menu-root ant-menu-inline ant-menu-light" role="menu" id="bmPositionMenu">
+            <li class="ant-menu-item ant-menu-item-selected" role="menuitem" data-position="home_large" data-guard="position"><span class="ant-menu-title-content">首頁大 Banner 管理</span></li>
+            <li class="ant-menu-item" role="menuitem" data-position="home_small" data-guard="position"><span class="ant-menu-title-content">首頁小 Banner 管理</span></li>
+            <li class="ant-menu-item" role="menuitem" data-position="login" data-guard="position"><span class="ant-menu-title-content">登入 Banner 管理</span></li>
+            <li class="ant-menu-item" role="menuitem" data-position="register" data-guard="position"><span class="ant-menu-title-content">註冊 Banner 管理</span></li>
+          </ul>
+        </div>
+
+        <div class="flex-1 min-w-0 flex flex-col gap-4">
+
+          <!-- Card: 搜尋條件區（各條件 AND，規格 A4；排序模式中仍可點擊但觸發離開提示，規格 C3/C6） -->
+          <div class="ant-card ant-card-bordered bm-search" data-guard="search">
+            <div class="ant-card-body">
+              <div class="bm-search-grid">
+                <div class="bm-search-field">
+                  <span class="bm-search-label">狀態</span>
+                  <!-- Select size="large" defaultValue="all" options=[全部/啟用/停用]（規格 A4） -->
+                  <div class="ant-select ant-select-lg ant-select-outlined ant-select-single ant-select-show-arrow bm-select" id="bmFilterStatus" data-value="all">
+                    <div class="ant-select-selector">
+                      <span class="ant-select-selection-item">全部</span>
+                    </div>
+                    <span class="ant-select-arrow"><!-- icon: FiChevronDown (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></span>
+                    <!-- Select 下拉（靜態版固定定位於欄位下方） -->
+                    <div class="ant-select-dropdown bm-select-dropdown" hidden>
+                      <div class="ant-select-item ant-select-item-option ant-select-item-option-selected" data-value="all"><div class="ant-select-item-option-content">全部</div></div>
+                      <div class="ant-select-item ant-select-item-option" data-value="enabled"><div class="ant-select-item-option-content">啟用</div></div>
+                      <div class="ant-select-item ant-select-item-option" data-value="disabled"><div class="ant-select-item-option-content">停用</div></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="bm-search-field bm-search-field-range">
+                  <span class="bm-search-label">顯示期間</span>
+                  <!-- DatePicker.RangePicker size="large"（靜態版以文字輸入模擬、無日曆彈層；預設未指定、查詢範圍限 3 個月，規格 A4） -->
+                  <div class="ant-picker ant-picker-range ant-picker-outlined ant-picker-large bm-filter-range" id="bmFilterRange">
+                    <div class="ant-picker-input"><input id="bmFilterStart" placeholder="開始日期" autocomplete="off"></div>
+                    <div class="ant-picker-range-separator"><span class="ant-picker-separator"><!-- icon: FiArrowRight (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span></span></div>
+                    <div class="ant-picker-input"><input id="bmFilterEnd" placeholder="結束日期" autocomplete="off"></div>
+                    <span class="ant-picker-suffix"><!-- icon: FiCalendar (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span></span>
+                  </div>
+                </div>
+                <div class="bm-search-field">
+                  <span class="bm-search-label">Banner 名稱</span>
+                  <!-- Input size="large"（模糊搜尋、英文不分大小寫、可特殊符號、即時擋 emoji，規格 A4） -->
+                  <input class="ant-input ant-input-lg ant-input-outlined" id="bmFilterName" placeholder="請輸入名稱" autocomplete="off">
+                </div>
+                <div class="bm-search-field bm-search-field-btn">
+                  <!-- Button type="primary" size="large": 搜尋（觸發查詢，規格 A4） -->
+                  <button type="button" class="ant-btn ant-btn-primary ant-btn-color-primary ant-btn-variant-solid ant-btn-lg" id="bmSearchBtn"><span>搜尋</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card: 列表工具列＋筆數＋資料表＋分頁（規格 A5/A6） -->
+          <div class="ant-card ant-card-bordered bm-list-card">
+            <div class="ant-card-body">
+
+              <div class="bm-toolbar">
+                <div class="flex items-center gap-2" id="bmIntervalWrap">
+                  <span class="bm-toolbar-label">輪播間隔</span>
+                  <!-- InputNumber size="large" defaultValue=2（未設定過顯示 2，規格 A5；範圍 TODO: 規格未定義，暫 1–60；儲存時機 TODO: 對接 GET/PUT /api/admin/banners/carousel；排序模式押灰鎖定，規格 C3） -->
+                  <div class="ant-input-number ant-input-number-lg ant-input-number-outlined bm-interval" id="bmInterval">
+                    <div class="ant-input-number-handler-wrap">
+                      <span class="ant-input-number-handler ant-input-number-handler-up" id="bmIntervalUp" role="button" aria-label="增加"><!-- icon:（antd InputNumber 內建 UpOutlined） --><span class="ant-input-number-handler-up-inner"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"></polyline></svg></span></span>
+                      <span class="ant-input-number-handler ant-input-number-handler-down" id="bmIntervalDown" role="button" aria-label="減少"><!-- icon:（antd InputNumber 內建 DownOutlined） --><span class="ant-input-number-handler-down-inner"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></span>
+                    </div>
+                    <div class="ant-input-number-input-wrap"><input class="ant-input-number-input" id="bmIntervalInput" value="2" inputmode="numeric" autocomplete="off" aria-label="輪播間隔秒數"></div>
+                  </div>
+                  <span class="bm-toolbar-label">秒</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <!-- Button size="large": 排序（進入排序模式，規格 C1/C3） -->
+                  <button type="button" class="ant-btn ant-btn-lg ant-btn-color-default ant-btn-variant-outlined" id="bmSortBtn"><span>排序</span></button>
+                  <!-- Button type="primary" size="large": 新增（開啟新增彈窗並帶入當前版位，規格 B2） -->
+                  <button type="button" class="ant-btn ant-btn-primary ant-btn-color-primary ant-btn-variant-solid ant-btn-lg" id="bmAddBtn"><span>新增</span></button>
+                  <!-- Button size="large": 取消（排序模式原位替換顯示；回復原順序並離開，規格 C3/C5） -->
+                  <button type="button" class="ant-btn ant-btn-lg ant-btn-color-default ant-btn-variant-outlined" id="bmSortCancelBtn" hidden><span>取消</span></button>
+                  <!-- Button type="primary" size="large" loading: 儲存（排序模式原位替換顯示；成功更新順位離開、失敗停留，規格 C5） -->
+                  <button type="button" class="ant-btn ant-btn-primary ant-btn-color-primary ant-btn-variant-solid ant-btn-lg" id="bmSortSaveBtn" hidden>
+                    <span class="ant-btn-icon ant-btn-loading-icon" id="bmSortSaveLoading" hidden><!-- icon: LoadingOutlined（antd loading 慣例） --><span class="anticon"><svg class="bm-spin" viewBox="0 0 1024 1024" width="14" height="14" fill="currentColor"><path d="M988 548c-19.9 0-36-16.1-36-36 0-59.4-11.6-117-34.6-171.3a440.45 440.45 0 00-94.3-139.9 437.71 437.71 0 00-139.9-94.3C629 83.6 571.4 72 512 72c-19.9 0-36-16.1-36-36s16.1-36 36-36c69.1 0 136.2 13.5 199.3 40.3C772.3 66 827 103 874 150c47 47 83.9 101.8 109.7 162.7 26.7 63.1 40.2 130.2 40.2 199.3.1 19.9-16 36-35.9 36z"></path></svg></span></span>
+                    <span>儲存</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 筆數（預設＝全部總筆數、搜尋後＝符合條件筆數，規格 A3/A5） -->
+              <div class="bm-count">筆數：<span id="bmCount">12</span></div>
+
+              <!-- Table columns=[排序,Banner 名稱,圖片,導向內容,狀態,顯示期間,操作] pagination=false（分頁另置下方；四版位各一組 tbody 預寫、JS 切換顯示；圖片欄顯示 PC 圖縮圖，規格 A5；未排序過依建立時間新到舊，規格 A3） -->
+              <div class="ant-table-wrapper bm-table" id="bmTable">
+                <div class="ant-spin-nested-loading">
+                  <div class="ant-spin-container">
+                    <div class="ant-table">
+                      <div class="ant-table-container">
+                        <div class="ant-table-content">
+                          <table>
+                            <colgroup>
+                              <col class="bm-colw-handle"><col class="bm-colw-order"><col class="bm-colw-name"><col class="bm-colw-img"><col><col class="bm-colw-status"><col class="bm-colw-period"><col class="bm-colw-action">
+                            </colgroup>
+                            <thead class="ant-table-thead">
+                              <tr>
+                                <th class="ant-table-cell bm-col-handle" aria-label="拖曳排序"></th>
+                                <th class="ant-table-cell bm-col-order">排序</th>
+                                <th class="ant-table-cell">Banner 名稱</th>
+                                <th class="ant-table-cell">圖片</th>
+                                <th class="ant-table-cell">導向內容</th>
+                                <th class="ant-table-cell">狀態</th>
+                                <th class="ant-table-cell">顯示期間</th>
+                                <th class="ant-table-cell">操作</th>
+                              </tr>
+                            </thead>
+
+                            <!-- 首頁大 Banner mock 12 筆（TODO: 實際由 GET /api/admin/banners?position=home_large 帶入） -->
+                            <tbody class="ant-table-tbody bm-tbody" id="bmBody-home_large" data-position="home_large">
+                              <tr class="ant-table-row bm-row" data-name="首儲100%獎勵" data-enabled="1" data-start="2026-07-15 00:00" data-end="2026-08-15 23:59">
+                                <!-- 拖曳把手欄（排序模式才顯示，規格 C4）icon: RiDraggable (react-icons/ri) -->
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">1</td>
+                                <td class="ant-table-cell">首儲100%獎勵</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-1.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">首儲100%獎勵</td>
+                                <!-- Switch: 狀態（啟用＝前台顯示意願，實際顯示＝啟用＋期間內；排序模式押灰鎖定，規格 A5.2/C3；切換直接生效，TODO: 對接 PATCH /api/admin/banners/{id}/status） -->
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-15 00:00 ~ 2026-08-15 23:59</td>
+                                <td class="ant-table-cell">
+                                  <div class="flex gap-2">
+                                    <!-- Button size="small": 編輯（TODO: 編輯流程待後續規格提供） -->
+                                    <button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button>
+                                    <!-- Button danger size="small": 刪除（TODO: 刪除流程待後續規格提供） -->
+                                    <button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button>
+                                  </div>
+                                </td>
+                              </tr>
+                              <!-- 以下各列結構同第 1 列，元件註解略 -->
+                              <tr class="ant-table-row bm-row" data-name="每日10%回饋" data-enabled="1" data-start="2026-07-14 00:00" data-end="2026-07-31 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">2</td>
+                                <td class="ant-table-cell">每日10%回饋</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-2.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">每日10%回饋</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-14 00:00 ~ 2026-07-31 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="新遊戲上架預告" data-enabled="0" data-start="2026-07-10 00:00" data-end="2026-07-20 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">3</td>
+                                <td class="ant-table-cell">新遊戲上架預告</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-3.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">－</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="false" class="ant-switch bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-10 00:00 ~ 2026-07-20 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="Dinosaur Paradise 上線" data-enabled="1" data-start="2026-07-08 00:00" data-end="2026-08-08 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">4</td>
+                                <td class="ant-table-cell">Dinosaur Paradise 上線</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-4.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">Dinosaur Paradise</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-08 00:00 ~ 2026-08-08 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="會員專屬禮遇" data-enabled="1" data-start="2026-07-06 00:00" data-end="2026-07-31 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">5</td>
+                                <td class="ant-table-cell">會員專屬禮遇</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-5.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">https://www.example.com/promo/member-exclusive</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-06 00:00 ~ 2026-07-31 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="夏季錦標賽" data-enabled="1" data-start="2026-07-01 00:00" data-end="2026-08-31 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">6</td>
+                                <td class="ant-table-cell">夏季錦標賽</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-6.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">https://www.example.com/tournament/summer</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-01 00:00 ~ 2026-08-31 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="新手教學專區" data-enabled="0" data-start="2026-06-25 00:00" data-end="2026-09-30 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">7</td>
+                                <td class="ant-table-cell">新手教學專區</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-1.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">https://www.example.com/guide/beginner</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="false" class="ant-switch bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-06-25 00:00 ~ 2026-09-30 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="週末充值加碼" data-enabled="1" data-start="2026-07-25 00:00" data-end="2026-08-25 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">8</td>
+                                <td class="ant-table-cell">週末充值加碼</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-2.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">週末充值加碼</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-25 00:00 ~ 2026-08-25 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="Lucky Spin 轉盤" data-enabled="0" data-start="2026-07-05 00:00" data-end="2026-07-26 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">9</td>
+                                <td class="ant-table-cell">Lucky Spin 轉盤</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-3.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">Lucky Spin</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="false" class="ant-switch bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-05 00:00 ~ 2026-07-26 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="VIP 升級禮包" data-enabled="1" data-start="2026-07-12 00:00" data-end="2026-08-12 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">10</td>
+                                <td class="ant-table-cell">VIP 升級禮包</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-4.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">https://vip.example.com/upgrade</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-12 00:00 ~ 2026-08-12 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="生日禮金活動" data-enabled="1" data-start="2026-08-01 00:00" data-end="2026-08-31 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">11</td>
+                                <td class="ant-table-cell">生日禮金活動</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-5.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">生日禮金</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-08-01 00:00 ~ 2026-08-31 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="品牌形象宣傳" data-enabled="1" data-start="2026-06-20 00:00" data-end="2026-12-31 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">12</td>
+                                <td class="ant-table-cell">品牌形象宣傳</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-6.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">－</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-06-20 00:00 ~ 2026-12-31 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                            </tbody>
+
+                            <!-- 首頁小 Banner mock 4 筆（結構同上；TODO: GET /api/admin/banners?position=home_small） -->
+                            <tbody class="ant-table-tbody bm-tbody" id="bmBody-home_small" data-position="home_small" hidden>
+                              <tr class="ant-table-row bm-row" data-name="每日簽到送好禮" data-enabled="1" data-start="2026-07-10 00:00" data-end="2026-08-10 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">1</td>
+                                <td class="ant-table-cell">每日簽到送好禮</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-2.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">每日簽到</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-10 00:00 ~ 2026-08-10 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="客服中心入口" data-enabled="1" data-start="2026-07-01 00:00" data-end="2026-12-31 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">2</td>
+                                <td class="ant-table-cell">客服中心入口</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-4.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">https://www.example.com/support</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-01 00:00 ~ 2026-12-31 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="直播賽事預告" data-enabled="0" data-start="2026-07-18 00:00" data-end="2026-07-25 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">3</td>
+                                <td class="ant-table-cell">直播賽事預告</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-6.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">－</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="false" class="ant-switch bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-18 00:00 ~ 2026-07-25 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="Mega Fortune 新玩法" data-enabled="1" data-start="2026-07-09 00:00" data-end="2026-08-09 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">4</td>
+                                <td class="ant-table-cell">Mega Fortune 新玩法</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-1.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">Mega Fortune</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-09 00:00 ~ 2026-08-09 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                            </tbody>
+
+                            <!-- 登入 Banner mock 3 筆（無「開啟遊戲」資料，規格 A5.1；TODO: GET /api/admin/banners?position=login） -->
+                            <tbody class="ant-table-tbody bm-tbody" id="bmBody-login" data-position="login" hidden>
+                              <tr class="ant-table-row bm-row" data-name="歡迎回歸禮" data-enabled="1" data-start="2026-07-01 00:00" data-end="2026-07-31 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">1</td>
+                                <td class="ant-table-cell">歡迎回歸禮</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-3.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">歡迎回歸禮</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-01 00:00 ~ 2026-07-31 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="帳號安全驗證提醒" data-enabled="1" data-start="2026-07-05 00:00" data-end="2026-09-30 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">2</td>
+                                <td class="ant-table-cell">帳號安全驗證提醒</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-5.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">https://www.example.com/account/security</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-05 00:00 ~ 2026-09-30 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="新版介面預告" data-enabled="0" data-start="2026-07-20 00:00" data-end="2026-08-20 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">3</td>
+                                <td class="ant-table-cell">新版介面預告</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-6.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">－</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="false" class="ant-switch bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-20 00:00 ~ 2026-08-20 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                            </tbody>
+
+                            <!-- 註冊 Banner mock 3 筆（無「開啟遊戲」資料，規格 A5.1；TODO: GET /api/admin/banners?position=register） -->
+                            <tbody class="ant-table-tbody bm-tbody" id="bmBody-register" data-position="register" hidden>
+                              <tr class="ant-table-row bm-row" data-name="新人首存禮" data-enabled="1" data-start="2026-07-01 00:00" data-end="2026-09-30 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">1</td>
+                                <td class="ant-table-cell">新人首存禮</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-1.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">新人首存禮</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-01 00:00 ~ 2026-09-30 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="註冊送免費體驗" data-enabled="1" data-start="2026-07-01 00:00" data-end="2026-08-31 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">2</td>
+                                <td class="ant-table-cell">註冊送免費體驗</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-2.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">https://www.example.com/welcome</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="true" class="ant-switch ant-switch-checked bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-01 00:00 ~ 2026-08-31 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                              <tr class="ant-table-row bm-row" data-name="服務條款更新公告" data-enabled="0" data-start="2026-07-15 00:00" data-end="2026-07-31 23:59">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">3</td>
+                                <td class="ant-table-cell">服務條款更新公告</td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-4.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target">－</td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="false" class="ant-switch bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period">2026-07-15 00:00 ~ 2026-07-31 23:59</td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                            </tbody>
+
+                            <!-- 新增列樣板（js/table.js 複製後填值插入第 1 順位；非顯示內容） -->
+                            <tbody id="bmRowTemplate" hidden>
+                              <tr class="ant-table-row bm-row" data-name="" data-enabled="0" data-start="" data-end="">
+                                <td class="ant-table-cell bm-col-handle"><span class="anticon bm-drag-handle"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.6"></circle><circle cx="15" cy="5" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="19" r="1.6"></circle><circle cx="15" cy="19" r="1.6"></circle></svg></span></td>
+                                <td class="ant-table-cell bm-col-order">1</td>
+                                <td class="ant-table-cell bm-cell-name"></td>
+                                <td class="ant-table-cell"><img class="bm-thumb" src="images/thumb-new.svg" alt="PC 圖縮圖"></td>
+                                <td class="ant-table-cell bm-target"></td>
+                                <td class="ant-table-cell"><button type="button" role="switch" aria-checked="false" class="ant-switch bm-switch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button></td>
+                                <td class="ant-table-cell bm-period"></td>
+                                <td class="ant-table-cell"><div class="flex gap-2"><button type="button" class="ant-btn ant-btn-sm ant-btn-color-default ant-btn-variant-outlined bm-edit-btn"><span>編輯</span></button><button type="button" class="ant-btn ant-btn-sm ant-btn-dangerous ant-btn-color-dangerous ant-btn-variant-outlined bm-delete-btn"><span>刪除</span></button></div></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pagination showSizeChanger pageSizeOptions=[10,20,50,100] defaultPageSize=20（規格 A6；排序模式中操作觸發離開提示，規格 C6） -->
+              <div class="bm-pagination-row">
+                <ul class="ant-pagination bm-pagination" id="bmPagination">
+                  <li class="ant-pagination-prev ant-pagination-disabled" id="bmPagePrev" data-guard="page"><button type="button" class="ant-pagination-item-link" aria-label="上一頁"><!-- icon: FiChevronLeft (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></span></button></li>
+                  <li class="ant-pagination-item ant-pagination-item-active" data-page="1" data-guard="page"><a>1</a></li>
+                  <li class="ant-pagination-item" data-page="2" data-guard="page" hidden><a>2</a></li>
+                  <li class="ant-pagination-item" data-page="3" data-guard="page" hidden><a>3</a></li>
+                  <li class="ant-pagination-next ant-pagination-disabled" id="bmPageNext" data-guard="page"><button type="button" class="ant-pagination-item-link" aria-label="下一頁"><!-- icon: FiChevronRight (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span></button></li>
+                  <li class="ant-pagination-options" data-guard="pagesize">
+                    <!-- Select: 每頁筆數 10/20/50/100，預設 20（規格 A6；筆數不受搜尋影響指預設筆數顯示，規格 A3） -->
+                    <div class="ant-select ant-select-outlined ant-select-single ant-select-show-arrow bm-select bm-pagesize" id="bmPageSize" data-value="20">
+                      <div class="ant-select-selector">
+                        <span class="ant-select-selection-item">20 筆/頁</span>
+                      </div>
+                      <span class="ant-select-arrow"><!-- icon: FiChevronDown (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></span>
+                      <div class="ant-select-dropdown bm-select-dropdown bm-select-dropdown-up" hidden>
+                        <div class="ant-select-item ant-select-item-option" data-value="10"><div class="ant-select-item-option-content">10 筆/頁</div></div>
+                        <div class="ant-select-item ant-select-item-option ant-select-item-option-selected" data-value="20"><div class="ant-select-item-option-content">20 筆/頁</div></div>
+                        <div class="ant-select-item ant-select-item-option" data-value="50"><div class="ant-select-item-option-content">50 筆/頁</div></div>
+                        <div class="ant-select-item ant-select-item-option" data-value="100"><div class="ant-select-item-option-content">100 筆/頁</div></div>
+                      </div>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Demo 控制（prototype 專用，非設計稿內容，轉 Figma 時忽略）：排序儲存結果模擬＋重設 Demo 資料 -->
+          <div class="bm-demo bm-demo-page">
+            <span class="bm-demo-title">Demo：模擬排序儲存結果（規格 C5，失敗＝網路斷線／API 失敗）</span>
+            <!-- Radio.Group: 模擬結果（js 切換 checked class；轉 Figma 時忽略） -->
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1" id="bmDemoSortGroup">
+              <label class="ant-radio-wrapper ant-radio-wrapper-checked">
+                <span class="ant-radio ant-radio-checked">
+                  <input type="radio" class="ant-radio-input" name="bmDemoSort" value="success" checked>
+                  <span class="ant-radio-inner"></span>
+                </span>
+                <span>儲存成功</span>
+              </label>
+              <label class="ant-radio-wrapper">
+                <span class="ant-radio">
+                  <input type="radio" class="ant-radio-input" name="bmDemoSort" value="fail">
+                  <span class="ant-radio-inner"></span>
+                </span>
+                <span>儲存失敗</span>
+              </label>
+            </div>
+            <!-- Button type="link": 重設 Demo 資料（清 localStorage＋reload；轉 Figma 時忽略） -->
+            <div class="flex justify-center">
+              <button type="button" class="ant-btn ant-btn-color-link ant-btn-variant-link" id="bmResetDemo"><span>重設 Demo 資料</span></button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </section>
+</section>
+
+<!-- Modal: 新增 Banner 彈窗（標題與圖片區塊標題依版位、登入／註冊無「開啟遊戲」，規格 B2/B5.4；左標籤橫式表單，規格 B3；js/add-modal.js 開關） -->
+<div class="ant-modal-root bm-modal bm-add-modal" id="bmAddModalRoot">
+  <div class="ant-modal-mask"></div>
+  <div class="ant-modal-wrap" id="bmAddModalWrap" role="dialog" aria-modal="true" aria-labelledby="bmAddModalTitle" tabindex="-1">
+    <div class="ant-modal" role="document">
+      <div class="ant-modal-content">
+        <!-- Modal 關閉按鈕（官方 CloseOutlined）：關閉＝取消語意，不儲存（規格 B6；送出中鎖定） -->
+        <button type="button" class="ant-modal-close" id="bmAddModalClose" aria-label="關閉">
+          <span class="ant-modal-close-x"><span class="anticon"><svg viewBox="64 64 896 896" width="16" height="16" fill="currentColor"><path d="M563.8 512l262.5-312.9c4.4-5.2.7-13.1-6.1-13.1h-79.8c-4.7 0-9.2 2.1-12.3 5.7L511.6 449.8 295.1 191.7c-3-3.6-7.5-5.7-12.3-5.7H203c-6.8 0-10.5 7.9-6.1 13.1L459.4 512 196.9 824.9A7.95 7.95 0 00203 838h79.8c4.7 0 9.2-2.1 12.3-5.7l216.5-258.1 216.5 258.1c3 3.6 7.5 5.7 12.3 5.7h79.8c6.8 0 10.5-7.9 6.1-13.1L563.8 512z"></path></svg></span></span>
+        </button>
+        <div class="ant-modal-header">
+          <div class="ant-modal-title" id="bmAddModalTitle">新增首頁大 Banner</div>
+        </div>
+        <div class="ant-modal-body">
+          <!-- Form layout="horizontal"（左標籤右欄位、必填紅星，規格 B3） -->
+          <form class="ant-form ant-form-horizontal bm-add-form" id="bmAddForm" novalidate>
+
+            <!-- Form.Item label="Banner 名稱" required（≤50 字、可重複、可特殊符號、即時擋 emoji，規格 B5.1） -->
+            <div class="ant-form-item">
+              <div class="ant-row ant-form-item-row">
+                <div class="ant-col ant-form-item-label bm-form-label"><label class="ant-form-item-required" for="bmName">Banner 名稱</label></div>
+                <div class="ant-col ant-form-item-control">
+                  <div class="ant-form-item-control-input">
+                    <div class="ant-form-item-control-input-content">
+                      <!-- Input showCount maxLength=50 placeholder="請輸入 Banner 名稱"（超字數以送出驗證擋，訊息見規格 B5.1） -->
+                      <span class="ant-input-affix-wrapper ant-input-outlined bm-name-wrap" id="bmNameWrap">
+                        <input class="ant-input" id="bmName" placeholder="請輸入 Banner 名稱" autocomplete="off">
+                        <span class="ant-input-suffix"><span class="ant-input-show-count-suffix" id="bmNameCount">0 / 50</span></span>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="ant-form-item-explain ant-form-item-explain-connected" id="bmErrNameWrap" hidden><div class="ant-form-item-explain-error" id="bmErrName">Banner 名稱是必填欄位</div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form.Item label="狀態"（Switch 預設停用＝意願開關，規格 B5.2/A5.2） -->
+            <div class="ant-form-item">
+              <div class="ant-row ant-form-item-row">
+                <div class="ant-col ant-form-item-label bm-form-label"><label for="bmStatusSwitch">狀態</label></div>
+                <div class="ant-col ant-form-item-control">
+                  <div class="ant-form-item-control-input">
+                    <div class="ant-form-item-control-input-content">
+                      <div class="flex items-center gap-2">
+                        <!-- Switch defaultChecked=false -->
+                        <button type="button" role="switch" aria-checked="false" class="ant-switch" id="bmStatusSwitch"><div class="ant-switch-handle"></div><span class="ant-switch-inner"><span class="ant-switch-inner-checked"></span><span class="ant-switch-inner-unchecked"></span></span></button>
+                        <span class="bm-status-text" id="bmStatusText">停用（預設）</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form.Item label="顯示時間" required（開始~結束、結束晚於開始、開始不早於現在；勾選套用活動廣告時間時鎖定，規格 B5.3） -->
+            <div class="ant-form-item">
+              <div class="ant-row ant-form-item-row">
+                <div class="ant-col ant-form-item-label bm-form-label"><label class="ant-form-item-required" for="bmStartAt">顯示時間</label></div>
+                <div class="ant-col ant-form-item-control">
+                  <div class="ant-form-item-control-input">
+                    <div class="ant-form-item-control-input-content">
+                      <!-- DatePicker.RangePicker showTime（靜態版以文字輸入模擬、無日曆彈層，格式 YYYY-MM-DD HH:mm） -->
+                      <div class="ant-picker ant-picker-range ant-picker-outlined bm-time-range" id="bmTimeRange">
+                        <div class="ant-picker-input"><input id="bmStartAt" placeholder="開始日期時間" autocomplete="off"></div>
+                        <div class="ant-picker-range-separator"><span class="ant-picker-separator"><!-- icon: FiArrowRight (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span></span></div>
+                        <div class="ant-picker-input"><input id="bmEndAt" placeholder="結束日期時間" autocomplete="off"></div>
+                        <span class="ant-picker-suffix"><!-- icon: FiCalendar (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="ant-form-item-explain ant-form-item-explain-connected" id="bmErrTimeWrap" hidden><div class="ant-form-item-explain-error" id="bmErrTime">顯示時間是必填欄位</div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form.Item label="點擊行為" required（5 選項；登入／註冊版位不顯示「開啟遊戲」；切換只顯示當前子欄位、已填值保留至送出，規格 B5.4） -->
+            <div class="ant-form-item">
+              <div class="ant-row ant-form-item-row">
+                <div class="ant-col ant-form-item-label bm-form-label"><label class="ant-form-item-required">點擊行為</label></div>
+                <div class="ant-col ant-form-item-control">
+                  <div class="ant-form-item-control-input">
+                    <div class="ant-form-item-control-input-content">
+                      <!-- Radio.Group options=[無動作/開啟活動/開啟遊戲/內部連結/外部連結] 預設未選 -->
+                      <div class="ant-radio-group ant-radio-group-outline bm-action-group" id="bmActionGroup">
+                        <label class="ant-radio-wrapper"><span class="ant-radio"><input type="radio" class="ant-radio-input" name="bmAction" value="none"><span class="ant-radio-inner"></span></span><span>無動作</span></label>
+                        <label class="ant-radio-wrapper"><span class="ant-radio"><input type="radio" class="ant-radio-input" name="bmAction" value="event"><span class="ant-radio-inner"></span></span><span>開啟活動</span></label>
+                        <label class="ant-radio-wrapper" id="bmActionOpt-game"><span class="ant-radio"><input type="radio" class="ant-radio-input" name="bmAction" value="game"><span class="ant-radio-inner"></span></span><span>開啟遊戲</span></label>
+                        <label class="ant-radio-wrapper"><span class="ant-radio"><input type="radio" class="ant-radio-input" name="bmAction" value="internal_link"><span class="ant-radio-inner"></span></span><span>內部連結</span></label>
+                        <label class="ant-radio-wrapper"><span class="ant-radio"><input type="radio" class="ant-radio-input" name="bmAction" value="external_link"><span class="ant-radio-inner"></span></span><span>外部連結</span></label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="ant-form-item-explain ant-form-item-explain-connected" id="bmErrActionWrap" hidden><div class="ant-form-item-explain-error" id="bmErrAction">點擊行為是必填欄位</div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form.Item label="選擇活動"（點擊行為＝開啟活動時顯示，必填；下拉僅列「啟用＋廣告時間未結束」活動，規格 B5.4(e)） -->
+            <div class="ant-form-item bm-sub-item" id="bmSubEvent" hidden>
+              <div class="ant-row ant-form-item-row">
+                <div class="ant-col ant-form-item-label bm-form-label"><label class="ant-form-item-required">選擇活動</label></div>
+                <div class="ant-col ant-form-item-control">
+                  <div class="ant-form-item-control-input">
+                    <div class="ant-form-item-control-input-content">
+                      <div class="flex flex-col gap-2">
+                        <!-- Select placeholder="請選擇活動"（TODO: 選項由 GET /api/admin/events/selectable 帶入） -->
+                        <div class="ant-select ant-select-outlined ant-select-single ant-select-show-arrow bm-select" id="bmEventSelect" data-value="">
+                          <div class="ant-select-selector">
+                            <span class="ant-select-selection-placeholder">請選擇活動</span>
+                            <span class="ant-select-selection-item" hidden></span>
+                          </div>
+                          <span class="ant-select-arrow"><!-- icon: FiChevronDown (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></span>
+                          <div class="ant-select-dropdown bm-select-dropdown" hidden>
+                            <!-- 活動選項（廣告時間附註便於 demo「套用」；mock 資料） -->
+                            <div class="ant-select-item ant-select-item-option" data-value="ev1" data-name="首儲100%獎勵" data-start="2026-07-15 00:00" data-end="2026-08-15 23:59"><div class="ant-select-item-option-content">首儲100%獎勵（廣告 2026-07-15 00:00 ~ 2026-08-15 23:59）</div></div>
+                            <div class="ant-select-item ant-select-item-option" data-value="ev2" data-name="每日10%回饋" data-start="2026-07-14 00:00" data-end="2026-07-31 23:59"><div class="ant-select-item-option-content">每日10%回饋（廣告 2026-07-14 00:00 ~ 2026-07-31 23:59）</div></div>
+                            <div class="ant-select-item ant-select-item-option" data-value="ev3" data-name="週末充值加碼" data-start="2026-07-25 00:00" data-end="2026-08-25 23:59"><div class="ant-select-item-option-content">週末充值加碼（廣告 2026-07-25 00:00 ~ 2026-08-25 23:59）</div></div>
+                            <div class="ant-select-item ant-select-item-option" data-value="ev4" data-name="生日禮金" data-start="2026-08-01 00:00" data-end="2026-08-31 23:59"><div class="ant-select-item-option-content">生日禮金（廣告 2026-08-01 00:00 ~ 2026-08-31 23:59）</div></div>
+                            <div class="ant-select-item ant-select-item-option" data-value="ev5" data-name="每日簽到" data-start="2026-07-01 00:00" data-end="2026-12-31 23:59"><div class="ant-select-item-option-content">每日簽到（廣告 2026-07-01 00:00 ~ 2026-12-31 23:59）</div></div>
+                            <div class="ant-select-item-empty bm-select-empty" id="bmEventEmpty" hidden>無資料</div>
+                          </div>
+                        </div>
+                        <!-- Checkbox: 套用活動廣告時間（勾選＝複製活動廣告起迄至顯示時間並鎖定、活動異動時連動更新（連動由後端／前台取值，prototype 不模擬）；未選活動前不可勾，規格 B5.4(e)；取消勾選＝解鎖保留值，D3-3 暫採建議） -->
+                        <label class="ant-checkbox-wrapper ant-checkbox-wrapper-disabled" id="bmApplyWrap">
+                          <span class="ant-checkbox"><input type="checkbox" class="ant-checkbox-input" id="bmApplyEventTime" disabled><span class="ant-checkbox-inner"></span></span>
+                          <span>套用活動廣告時間</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="ant-form-item-explain ant-form-item-explain-connected" id="bmErrEventWrap" hidden><div class="ant-form-item-explain-error" id="bmErrEvent">選擇活動是必填欄位</div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form.Item label="選擇遊戲"（點擊行為＝開啟遊戲時顯示，必填；可搜尋選擇器為規格建議；登入／註冊版位無此項，規格 B5.4(d)） -->
+            <div class="ant-form-item bm-sub-item" id="bmSubGame" hidden>
+              <div class="ant-row ant-form-item-row">
+                <div class="ant-col ant-form-item-label bm-form-label"><label class="ant-form-item-required">選擇遊戲</label></div>
+                <div class="ant-col ant-form-item-control">
+                  <div class="ant-form-item-control-input">
+                    <div class="ant-form-item-control-input-content">
+                      <!-- Select showSearch placeholder="請選擇遊戲"（TODO: 選項由 GET /api/admin/games/selectable 帶入，支援關鍵字搜尋） -->
+                      <div class="ant-select ant-select-outlined ant-select-single ant-select-show-arrow ant-select-show-search bm-select bm-select-search" id="bmGameSelect" data-value="">
+                        <div class="ant-select-selector">
+                          <span class="ant-select-selection-search"><input type="text" class="ant-select-selection-search-input" id="bmGameSearch" autocomplete="off" role="combobox" aria-label="搜尋遊戲"></span>
+                          <span class="ant-select-selection-placeholder">請選擇遊戲</span>
+                          <span class="ant-select-selection-item" hidden></span>
+                        </div>
+                        <span class="ant-select-arrow"><!-- icon: FiChevronDown (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></span>
+                        <div class="ant-select-dropdown bm-select-dropdown" hidden>
+                          <div class="ant-select-item ant-select-item-option" data-value="g1" data-name="Dinosaur Paradise"><div class="ant-select-item-option-content">Dinosaur Paradise</div></div>
+                          <div class="ant-select-item ant-select-item-option" data-value="g2" data-name="Lucky Spin"><div class="ant-select-item-option-content">Lucky Spin</div></div>
+                          <div class="ant-select-item ant-select-item-option" data-value="g3" data-name="Mega Fortune"><div class="ant-select-item-option-content">Mega Fortune</div></div>
+                          <div class="ant-select-item ant-select-item-option" data-value="g4" data-name="Dragon Treasure"><div class="ant-select-item-option-content">Dragon Treasure</div></div>
+                          <div class="ant-select-item ant-select-item-option" data-value="g5" data-name="Golden Sevens"><div class="ant-select-item-option-content">Golden Sevens</div></div>
+                          <div class="ant-select-item ant-select-item-option" data-value="g6" data-name="Ocean King"><div class="ant-select-item-option-content">Ocean King</div></div>
+                          <div class="ant-select-item ant-select-item-option" data-value="g7" data-name="Fruit Blast"><div class="ant-select-item-option-content">Fruit Blast</div></div>
+                          <div class="ant-select-item ant-select-item-option" data-value="g8" data-name="Space Miner"><div class="ant-select-item-option-content">Space Miner</div></div>
+                          <div class="ant-select-item-empty bm-select-empty" id="bmGameEmpty" hidden>無資料</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="ant-form-item-explain ant-form-item-explain-connected" id="bmErrGameWrap" hidden><div class="ant-form-item-explain-error" id="bmErrGame">選擇遊戲是必填欄位</div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form.Item label="連結 URL"（點擊行為＝內部／外部連結時顯示，必填；需 http(s):// 開頭；內部連結需填語系前 Domain、站內網域驗證深度待確認 D3-2，規格 B5.4(b)(c)） -->
+            <div class="ant-form-item bm-sub-item" id="bmSubLink" hidden>
+              <div class="ant-row ant-form-item-row">
+                <div class="ant-col ant-form-item-label bm-form-label"><label class="ant-form-item-required" for="bmLinkUrl">連結 URL</label></div>
+                <div class="ant-col ant-form-item-control">
+                  <div class="ant-form-item-control-input">
+                    <div class="ant-form-item-control-input-content">
+                      <!-- Input placeholder="請輸入連結 URL" -->
+                      <input class="ant-input ant-input-outlined" id="bmLinkUrl" placeholder="請輸入連結 URL" autocomplete="off">
+                    </div>
+                  </div>
+                  <div class="ant-form-item-explain ant-form-item-explain-connected" id="bmErrLinkWrap" hidden><div class="ant-form-item-explain-error" id="bmErrLink">連結是必填欄位</div></div>
+                  <!-- 欄位下方範例文字（規格 B5.4；內部連結補「語系前 Domain」填寫規則提示） -->
+                  <div class="ant-form-item-extra" id="bmLinkExtra">範例：https://www.example.com</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="ant-divider ant-divider-horizontal bm-img-divider" role="separator"></div>
+
+            <!-- 圖片區塊（標題依版位；PC/Mobile 必填、Tablet 選填；尺寸 1920×450／375×240／840×350、單檔 ≤1MB，規格 B5.5、D3-8 暫依四版位共用） -->
+            <div class="bm-img-section">
+              <p class="bm-img-title"><span class="bm-req">*</span><span id="bmImgSectionTitle">大 Banner 圖片</span>：</p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <!-- 上傳欄位：PC 圖片（必填 1920×450 ≤1MB；上傳互動見 js/upload.js） -->
+                <div class="bm-upload" id="bmUp-pc" data-device="pc" data-w="1920" data-h="450" data-required="1" data-label="PC 圖片">
+                  <p class="bm-upload-label">PC 圖片</p>
+                  <p class="bm-upload-hint">（寬 1920、高 450，檔案大小限制最高 1MB）</p>
+                  <!-- Upload.Dragger accept="image/*" maxCount=1（拖曳上傳＋進度條，規格 B5.5；TODO: 對接圖片上傳 API） -->
+                  <span class="ant-upload-wrapper">
+                    <div class="ant-upload ant-upload-drag">
+                      <span tabindex="0" class="ant-upload ant-upload-btn" role="button">
+                        <input type="file" accept="image/*" class="bm-upload-file" hidden>
+                        <div class="ant-upload-drag-container">
+                          <p class="ant-upload-drag-icon"><!-- icon: FiUploadCloud (react-icons/fi) --><span class="anticon"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path></svg></span></p>
+                          <p class="ant-upload-text">拖曳圖片至此</p>
+                        </div>
+                      </span>
+                    </div>
+                  </span>
+                  <!-- Progress percent=0（上傳進度條，動畫以 class 驅動） -->
+                  <div class="ant-progress ant-progress-line bm-upload-progress">
+                    <div class="ant-progress-outer"><div class="ant-progress-inner"><div class="ant-progress-bg"></div></div></div>
+                    <span class="ant-progress-text bm-upload-progress-text">0%</span>
+                  </div>
+                  <!-- 上傳成功預覽（重新拖曳／點擊上傳區可替換） -->
+                  <div class="bm-upload-preview" hidden>
+                    <img class="bm-upload-preview-img" alt="已上傳圖片預覽" src="images/thumb-new.svg">
+                    <span class="bm-upload-preview-name">示意圖片.png</span>
+                    <!-- Button type="link" size="small": 移除 -->
+                    <button type="button" class="ant-btn ant-btn-sm ant-btn-color-link ant-btn-variant-link bm-upload-remove"><span>移除</span></button>
+                  </div>
+                  <div class="bm-upload-error" hidden></div>
+                </div>
+
+                <!-- 上傳欄位：Mobile 圖片（必填 375×240 ≤1MB；結構同 PC，元件註解略） -->
+                <div class="bm-upload" id="bmUp-mobile" data-device="mobile" data-w="375" data-h="240" data-required="1" data-label="Mobile 圖片">
+                  <p class="bm-upload-label">Mobile 圖片</p>
+                  <p class="bm-upload-hint">（寬 375、高 240，檔案大小限制最高 1MB）</p>
+                  <span class="ant-upload-wrapper">
+                    <div class="ant-upload ant-upload-drag">
+                      <span tabindex="0" class="ant-upload ant-upload-btn" role="button">
+                        <input type="file" accept="image/*" class="bm-upload-file" hidden>
+                        <div class="ant-upload-drag-container">
+                          <p class="ant-upload-drag-icon"><span class="anticon"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path></svg></span></p>
+                          <p class="ant-upload-text">拖曳圖片至此</p>
+                        </div>
+                      </span>
+                    </div>
+                  </span>
+                  <div class="ant-progress ant-progress-line bm-upload-progress">
+                    <div class="ant-progress-outer"><div class="ant-progress-inner"><div class="ant-progress-bg"></div></div></div>
+                    <span class="ant-progress-text bm-upload-progress-text">0%</span>
+                  </div>
+                  <div class="bm-upload-preview" hidden>
+                    <img class="bm-upload-preview-img" alt="已上傳圖片預覽" src="images/thumb-new.svg">
+                    <span class="bm-upload-preview-name">示意圖片.png</span>
+                    <button type="button" class="ant-btn ant-btn-sm ant-btn-color-link ant-btn-variant-link bm-upload-remove"><span>移除</span></button>
+                  </div>
+                  <div class="bm-upload-error" hidden></div>
+                </div>
+
+                <!-- 上傳欄位：Tablet 圖片（選填 840×350 ≤1MB；結構同 PC，元件註解略） -->
+                <div class="bm-upload" id="bmUp-tablet" data-device="tablet" data-w="840" data-h="350" data-required="0" data-label="Tablet 圖片">
+                  <p class="bm-upload-label">Tablet 圖片（選填）</p>
+                  <p class="bm-upload-hint">（寬 840、高 350，檔案大小限制最高 1MB）</p>
+                  <span class="ant-upload-wrapper">
+                    <div class="ant-upload ant-upload-drag">
+                      <span tabindex="0" class="ant-upload ant-upload-btn" role="button">
+                        <input type="file" accept="image/*" class="bm-upload-file" hidden>
+                        <div class="ant-upload-drag-container">
+                          <p class="ant-upload-drag-icon"><span class="anticon"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path></svg></span></p>
+                          <p class="ant-upload-text">拖曳圖片至此</p>
+                        </div>
+                      </span>
+                    </div>
+                  </span>
+                  <div class="ant-progress ant-progress-line bm-upload-progress">
+                    <div class="ant-progress-outer"><div class="ant-progress-inner"><div class="ant-progress-bg"></div></div></div>
+                    <span class="ant-progress-text bm-upload-progress-text">0%</span>
+                  </div>
+                  <div class="bm-upload-preview" hidden>
+                    <img class="bm-upload-preview-img" alt="已上傳圖片預覽" src="images/thumb-new.svg">
+                    <span class="bm-upload-preview-name">示意圖片.png</span>
+                    <button type="button" class="ant-btn ant-btn-sm ant-btn-color-link ant-btn-variant-link bm-upload-remove"><span>移除</span></button>
+                  </div>
+                  <div class="bm-upload-error" hidden></div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Demo 控制（prototype 專用，非設計稿內容，轉 Figma 時忽略）：上傳結果與活動清單模擬 -->
+            <div class="bm-demo bm-demo-modal">
+              <span class="bm-demo-title">Demo：上傳結果模擬（規格 B5.5 驗證分支）</span>
+              <!-- Radio.Group: 上傳模擬結果（js 切換 checked class；轉 Figma 時忽略） -->
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1" id="bmDemoUploadGroup">
+                <label class="ant-radio-wrapper ant-radio-wrapper-checked">
+                  <span class="ant-radio ant-radio-checked"><input type="radio" class="ant-radio-input" name="bmDemoUpload" value="sim-success" checked><span class="ant-radio-inner"></span></span>
+                  <span>成功（點擊即模擬，免選檔）</span>
+                </label>
+                <label class="ant-radio-wrapper">
+                  <span class="ant-radio"><input type="radio" class="ant-radio-input" name="bmDemoUpload" value="sim-size"><span class="ant-radio-inner"></span></span>
+                  <span>尺寸不符</span>
+                </label>
+                <label class="ant-radio-wrapper">
+                  <span class="ant-radio"><input type="radio" class="ant-radio-input" name="bmDemoUpload" value="sim-1mb"><span class="ant-radio-inner"></span></span>
+                  <span>大小不符（&gt;1MB）</span>
+                </label>
+                <label class="ant-radio-wrapper">
+                  <span class="ant-radio"><input type="radio" class="ant-radio-input" name="bmDemoUpload" value="real"><span class="ant-radio-inner"></span></span>
+                  <span>實際選檔驗證</span>
+                </label>
+              </div>
+              <span class="bm-demo-title">Demo：可選活動清單（規格 B5.4(e)「無任何可選活動」情境）</span>
+              <!-- Radio.Group: 活動清單模擬（js 切換 checked class；轉 Figma 時忽略） -->
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1" id="bmDemoEventsGroup">
+                <label class="ant-radio-wrapper ant-radio-wrapper-checked">
+                  <span class="ant-radio ant-radio-checked"><input type="radio" class="ant-radio-input" name="bmDemoEvents" value="has" checked><span class="ant-radio-inner"></span></span>
+                  <span>有可選活動</span>
+                </label>
+                <label class="ant-radio-wrapper">
+                  <span class="ant-radio"><input type="radio" class="ant-radio-input" name="bmDemoEvents" value="empty"><span class="ant-radio-inner"></span></span>
+                  <span>無任何可選活動</span>
+                </label>
+              </div>
+            </div>
+
+          </form>
+        </div>
+        <div class="ant-modal-footer">
+          <!-- Button size="large": 取消（關閉不儲存，規格 B6；TODO: 已填寫時「捨棄變更」二次確認為規格建議，依專案慣例不臆測確認流程，未實作） -->
+          <button type="button" class="ant-btn ant-btn-lg ant-btn-color-default ant-btn-variant-outlined" id="bmAddCancelBtn"><span>取消</span></button>
+          <!-- Button type="primary" size="large": 新增（驗證失敗 inline 紅字保留彈窗；通過→Toast 新增成功＋排第 1 順位＋關閉刷新，規格 B6；TODO: 對接 POST /api/admin/banners） -->
+          <button type="button" class="ant-btn ant-btn-primary ant-btn-color-primary ant-btn-variant-solid ant-btn-lg" id="bmAddSubmitBtn">
+            <span class="ant-btn-icon ant-btn-loading-icon" id="bmAddSubmitLoading" hidden><!-- icon: LoadingOutlined（antd loading 慣例） --><span class="anticon"><svg class="bm-spin" viewBox="0 0 1024 1024" width="14" height="14" fill="currentColor"><path d="M988 548c-19.9 0-36-16.1-36-36 0-59.4-11.6-117-34.6-171.3a440.45 440.45 0 00-94.3-139.9 437.71 437.71 0 00-139.9-94.3C629 83.6 571.4 72 512 72c-19.9 0-36-16.1-36-36s16.1-36 36-36c69.1 0 136.2 13.5 199.3 40.3C772.3 66 827 103 874 150c47 47 83.9 101.8 109.7 162.7 26.7 63.1 40.2 130.2 40.2 199.3.1 19.9-16 36-35.9 36z"></path></svg></span></span>
+            <span>新增</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: 尚未儲存離開提示（排序模式站內操作觸發；確認＝不儲存前往、取消＝停留，規格 C6；js/sort-mode.js 開關） -->
+<div class="ant-modal-root bm-modal bm-leave-modal" id="bmLeaveModalRoot">
+  <div class="ant-modal-mask"></div>
+  <div class="ant-modal-wrap" id="bmLeaveModalWrap" role="dialog" aria-modal="true" aria-labelledby="bmLeaveTitle" tabindex="-1">
+    <div class="ant-modal" role="document">
+      <div class="ant-modal-content">
+        <div class="ant-modal-body">
+          <div class="bm-leave-body">
+            <!-- icon: ExclamationCircleFilled（antd Modal 警告慣例） -->
+            <span class="anticon bm-leave-icon"><svg viewBox="64 64 896 896" width="22" height="22" fill="currentColor"><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm-32 232c0-4.4 3.6-8 8-8h48c4.4 0 8 3.6 8 8v272c0 4.4-3.6 8-8 8h-48c-4.4 0-8-3.6-8-8V296zm32 440a48.01 48.01 0 010-96 48.01 48.01 0 010 96z"></path></svg></span>
+            <div class="bm-leave-text">
+              <div class="bm-leave-title" id="bmLeaveTitle">警告！尚未儲存，確認離開頁面嗎？</div>
+              <div class="bm-leave-desc">確認離開將不儲存本次排序，並切換到目標頁面。</div>
+            </div>
+          </div>
+        </div>
+        <div class="ant-modal-footer">
+          <!-- Button size="large": 取消（停留排序模式） -->
+          <button type="button" class="ant-btn ant-btn-lg ant-btn-color-default ant-btn-variant-outlined" id="bmLeaveCancel"><span>取消</span></button>
+          <!-- Button type="primary" size="large": 確認離開（不儲存並切換到目標頁面） -->
+          <button type="button" class="ant-btn ant-btn-primary ant-btn-color-primary ant-btn-variant-solid ant-btn-lg" id="bmLeaveConfirm"><span>確認離開</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- message toast（js/toast.js 切換，同時僅顯示一種 notice） -->
+<div class="ant-message bm-toast" id="bmToast">
+  <!-- message.success -->
+  <div class="ant-message-notice-wrapper" id="bmToast-success" hidden>
+    <div class="ant-message-notice">
+      <div class="ant-message-notice-content">
+        <span class="ant-message-custom-content ant-message-success">
+          <!-- icon: CheckCircleFilled（antd message 內建） -->
+          <span class="anticon bm-toast-icon"><svg viewBox="64 64 896 896" width="16" height="16" fill="currentColor"><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm193.5 301.7l-210.6 292a31.8 31.8 0 01-51.7 0L318.5 484.9c-3.8-5.3 0-12.7 6.5-12.7h46.9c10.2 0 19.9 4.9 25.9 13.3l71.2 98.8 157.2-218c6-8.3 15.6-13.3 25.9-13.3H699c6.5 0 10.3 7.4 6.5 12.7z"></path></svg></span>
+          <span id="bmToastText-success">新增成功</span>
+        </span>
+      </div>
+    </div>
+  </div>
+  <!-- message.error -->
+  <div class="ant-message-notice-wrapper" id="bmToast-error" hidden>
+    <div class="ant-message-notice">
+      <div class="ant-message-notice-content">
+        <span class="ant-message-custom-content ant-message-error">
+          <!-- icon: CloseCircleFilled（antd message 內建） -->
+          <span class="anticon bm-toast-icon"><svg viewBox="64 64 896 896" width="16" height="16" fill="currentColor"><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm165.4 618.2l-66-.3L512 563.4l-99.3 118.4-66.1.3c-4.4 0-8-3.5-8-8 0-1.9.7-3.7 1.9-5.2l130.1-155L340.5 359a8.32 8.32 0 01-1.9-5.2c0-4.4 3.6-8 8-8l66.1.3L512 464.6l99.3-118.4 66-.3c4.4 0 8 3.5 8 8 0 1.9-.7 3.7-1.9 5.2L553.5 514l130 155c1.2 1.5 1.9 3.3 1.9 5.2 0 4.4-3.6 8-8 8z"></path></svg></span>
+          <span id="bmToastText-error">儲存失敗</span>
+        </span>
+      </div>
+    </div>
+  </div>
+  <!-- message.warning -->
+  <div class="ant-message-notice-wrapper" id="bmToast-warning" hidden>
+    <div class="ant-message-notice">
+      <div class="ant-message-notice-content">
+        <span class="ant-message-custom-content ant-message-warning">
+          <!-- icon: ExclamationCircleFilled（antd message 內建） -->
+          <span class="anticon bm-toast-icon"><svg viewBox="64 64 896 896" width="16" height="16" fill="currentColor"><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm-32 232c0-4.4 3.6-8 8-8h48c4.4 0 8 3.6 8 8v272c0 4.4-3.6 8-8 8h-48c-4.4 0-8-3.6-8-8V296zm32 440a48.01 48.01 0 010-96 48.01 48.01 0 010 96z"></path></svg></span>
+          <span id="bmToastText-warning">操作提示</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/mock.js"></script>
+<script src="js/select.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/demo.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/search.js"></script>
+<script src="js/toolbar.js"></script>
+<script src="js/table.js"></script>
+<script src="js/sort-mode.js"></script>
+<script src="js/upload.js"></script>
+<script src="js/add-modal.js"></script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+/* 全站框架：頂欄＋側欄＋內容（antd token：colorBgContainer #fff、colorSplit rgba(5,5,5,0.06)） */
+.bm-shell {
+  min-height: 100vh;
+}
+
+.bm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid rgba(5, 5, 5, 0.06);
+  padding-inline: 16px;
+  height: 56px;
+  line-height: 56px;
+}
+
+.bm-logo {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.bm-header-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.bm-header-avatar {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bm-body {
+  align-items: stretch;
+}
+
+/* Layout.Sider width=208 模擬（antd.css 未含 Sider 樣式） */
+.bm-sider {
+  flex: 0 0 208px;
+  width: 208px;
+  background: #fff;
+  border-right: 1px solid rgba(5, 5, 5, 0.06);
+  padding-top: 8px;
+}
+
+.bm-sider-menu.ant-menu {
+  border-inline-end: none;
+}
+
+/* Menu inline 縮排（真 antd 以 inline style 計算層級縮排，靜態版以 css 固定） */
+.bm-sider-menu > .ant-menu-item,
+.bm-sider-menu .ant-menu-submenu-title {
+  padding-left: 24px;
+  padding-right: 34px;
+  margin-inline: 4px;
+  width: calc(100% - 8px);
+}
+
+.bm-sider-menu .ant-menu-sub .ant-menu-item {
+  padding-left: 48px;
+  margin-inline: 4px;
+  width: calc(100% - 8px);
+}
+
+.bm-content {
+  padding: 16px 24px 32px;
+  min-width: 0;
+}
+
+.bm-page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  margin: 0 0 8px;
+}
+
+/* Tabs ink bar 靜態定位（真 antd 由 JS 量測） */
+.bm-tabs {
+  margin-bottom: 16px;
+}
+
+.bm-tabs .ant-tabs-nav-list {
+  position: relative;
+}
+
+.bm-tabs .ant-tabs-ink-bar {
+  left: 0;
+  width: 52px;
+}
+
+/* Banner 版位子選單（卡片容器＋inline Menu） */
+.bm-submenu {
+  flex: 0 0 200px;
+  width: 200px;
+  background: #fff;
+  border: 1px solid rgba(5, 5, 5, 0.06);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.bm-submenu .ant-menu {
+  border-inline-end: none;
+}
+
+.bm-submenu .ant-menu-item {
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-inline: 0;
+  width: 100%;
+}
+
+@media (max-width: 991px) {
+  .bm-main-row {
+    flex-direction: column;
+  }
+
+  .bm-submenu {
+    width: 100%;
+    flex: none;
+  }
+}

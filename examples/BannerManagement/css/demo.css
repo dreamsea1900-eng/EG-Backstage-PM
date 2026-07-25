@@ -1,0 +1,17 @@
+/* Demo 控制區（prototype 專用，轉 Figma 時忽略） */
+.bm-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(5, 5, 5, 0.06);
+}
+
+.bm-demo-title {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.bm-demo-modal {
+  margin-top: 16px;
+}

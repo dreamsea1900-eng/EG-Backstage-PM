@@ -1,0 +1,21 @@
+/* Toast 顯示位置（靜態版簡化：固定頂部置中） */
+.bm-toast {
+  display: none;
+  position: fixed;
+  top: 24px;
+  left: 0;
+  right: 0;
+  z-index: 2010;
+  text-align: center;
+  pointer-events: none;
+}
+
+.bm-toast.bm-toast-show {
+  display: block;
+}
+
+/* icon 與文字間距（antd message 慣例） */
+.bm-toast-icon {
+  margin-right: 8px;
+  vertical-align: -0.185em;
+}

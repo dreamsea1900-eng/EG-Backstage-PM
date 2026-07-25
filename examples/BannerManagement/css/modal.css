@@ -1,0 +1,216 @@
+/* 頁內 Modal（開關以 class 切換，JS 不操作 .style） */
+.bm-modal {
+  display: none;
+}
+
+.bm-modal.bm-modal-open {
+  display: block;
+}
+
+/* 新增彈窗：寬 640、置中偏上；內容過長時 wrap 可捲動 */
+.bm-add-modal .ant-modal {
+  width: 640px;
+  max-width: calc(100vw - 32px);
+  top: 48px;
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+
+.bm-add-modal .ant-modal-wrap {
+  overflow: auto;
+}
+
+.bm-add-modal .ant-modal-body {
+  padding-top: 8px;
+}
+
+/* 離開確認彈窗：寬 420 */
+.bm-leave-modal .ant-modal {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  top: 160px;
+  margin: 0 auto;
+}
+
+.bm-leave-body {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+/* antd token：colorWarning #faad14 */
+.bm-leave-icon {
+  color: #faad14;
+  flex: none;
+  margin-top: 2px;
+}
+
+.bm-leave-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  margin-bottom: 8px;
+}
+
+.bm-leave-desc {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+/* 左標籤橫式表單（規格 B3）：標籤固定寬、右欄位撐滿 */
+.bm-add-form .ant-form-item {
+  margin-bottom: 16px;
+}
+
+.bm-add-form .ant-form-item-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.bm-form-label {
+  flex: 0 0 96px;
+  width: 96px;
+  text-align: right;
+  padding-top: 5px;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.bm-add-form .ant-form-item-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.bm-time-range {
+  width: 100%;
+}
+
+.bm-name-wrap {
+  width: 100%;
+}
+
+.bm-status-text {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.bm-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding-top: 5px;
+}
+
+.bm-img-divider {
+  margin: 8px 0 16px;
+}
+
+/* 圖片區塊標題與必填星（antd token：colorError #ff4d4f） */
+.bm-img-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  margin: 0 0 12px;
+}
+
+.bm-req {
+  color: #ff4d4f;
+  margin-right: 4px;
+}
+
+/* 上傳欄位 */
+.bm-upload-label {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.88);
+  margin: 0 0 2px;
+}
+
+.bm-upload-hint {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  margin: 0 0 8px;
+}
+
+.bm-upload .ant-upload-drag {
+  height: 110px;
+}
+
+.bm-upload .ant-upload-drag .ant-upload-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.bm-upload .ant-upload-drag-icon {
+  color: #1677ff;
+  margin-bottom: 4px;
+}
+
+.bm-upload .ant-upload-text {
+  font-size: 14px;
+}
+
+/* 上傳進度條動畫（class 驅動；JS 不操作 .style） */
+.bm-upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bm-upload-progress .ant-progress-outer {
+  flex: 1;
+}
+
+.bm-upload-progress .ant-progress-bg {
+  width: 0;
+  height: 6px;
+}
+
+.bm-upload-progress.bm-prog-run .ant-progress-bg {
+  animation: bmProgress 0.9s linear forwards;
+}
+
+.bm-upload-progress.bm-prog-done .ant-progress-bg {
+  width: 100%;
+}
+
+@keyframes bmProgress {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+.bm-upload-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bm-upload-preview-img {
+  width: 96px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.bm-upload-preview-name {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+/* 上傳錯誤（inline 紅字，antd token：colorError） */
+.bm-upload-error {
+  color: #ff4d4f;
+  font-size: 12px;
+  margin-top: 4px;
+}

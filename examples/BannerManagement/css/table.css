@@ -1,0 +1,91 @@
+/* 資料表：內容優先欄寬（table-layout: auto）——每欄先撐住內容不擠壓，
+   剩餘寬度由瀏覽器自動分配給各欄，整列左右填滿；容器不足時橫向捲動 */
+.bm-table .ant-table-content {
+  overflow-x: auto;
+}
+
+.bm-table table {
+  width: 100%;
+}
+
+/* 表頭文字保持單行 */
+.bm-table th.ant-table-cell {
+  white-space: nowrap;
+}
+
+.bm-thumb {
+  width: 128px;
+  height: 30px;
+  border-radius: 4px;
+  display: block;
+  max-width: 100%;
+}
+
+.bm-target {
+  word-break: break-all;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.bm-period {
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+}
+
+/* 拖曳把手欄與「排序」順位欄：一般模式隱藏、排序模式才顯示（設計決策 2026-07-17；
+   規格 wireframe §A 列表原有排序欄，改為僅排序模式呈現） */
+.bm-col-handle,
+.bm-col-order {
+  display: none;
+}
+
+.bm-sorting .bm-col-handle,
+.bm-sorting .bm-col-order {
+  display: table-cell;
+}
+
+.bm-drag-handle {
+  color: rgba(0, 0, 0, 0.45);
+  cursor: grab;
+}
+
+.bm-sorting .bm-row {
+  cursor: grab;
+}
+
+/* 拖曳中資料列外框強調（規格 C4；antd token：colorPrimary #1677ff、colorPrimaryBg #e6f4ff） */
+.bm-row-dragging {
+  outline: 2px solid #1677ff;
+  outline-offset: -2px;
+}
+
+.bm-row-dragging > td.ant-table-cell {
+  background: #e6f4ff;
+}
+
+/* 分頁列 */
+.bm-pagination-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.bm-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bm-pagination .ant-pagination-item-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.bm-pagesize {
+  min-width: 110px;
+}
