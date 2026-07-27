@@ -17,7 +17,7 @@ $ARGUMENTS
    仍不確定的**一次問完**，不要邊做邊問；意見可能是在回報 bug（如「icon 沒帶入」），先查根因再定改法。
 2. **只讀受影響小檔**：依 `antd-static-layout` 第 7 節，只讀對應區塊的 html 區段／css／js 檔；
    已在 context 的檔案不重讀，以最省 token 的方式定位。
-3. **計畫確認**：依全域規範列計畫＋預估 token %，AskUserQuestion（執行／取消）確認後才動手。
+3. **計畫確認**：列計畫＋預估 token %（基準見 `AGENTS.md`〈工具對應〉），以「選項確認」發問（執行／取消），PM 選「執行」才動手。
 4. **修改**：切版遵循 `antd-static-layout`、互動與 mock 遵循 `antd-proto-interactions`；
    規格未定義處留 `TODO` 不臆測；只動對應區塊檔案，不重寫整份專案；完整度比照 `examples/` 黃金範例。
 5. **驗證**：`bash .claude/skills/antd-verify/scripts/verify.sh <頁面資料夾>` 跑到 0 ERROR／判讀 WARN；
