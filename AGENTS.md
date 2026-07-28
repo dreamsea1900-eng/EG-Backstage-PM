@@ -73,6 +73,9 @@
 4. **每輪驗證**：改完跑 `antd-verify`（靜態），到 0 ERROR
 5. **交回設計師 review**：通過後才納入正式專案；轉 Figma 由設計師執行，PM 不碰
 
+> **交付定義（不論工具）**：一輪交付＝`antd-verify` 0 ERROR ＋ 交付摘要 ＋ WORKLOG 已寫入——
+> 三者缺一即未完成，且全程**不需使用者提醒**。
+
 > **品質期待**：第一版以「對齊 `examples/` 黃金範例」為目標；若仍不足，用**新增/修改模式**補 1–2 輪即可到位。
 > 製作請用**夠強的模型**——Claude Code 用 Opus、Codex 用最高推理檔，模型能力直接影響產出深度。
 
@@ -100,6 +103,8 @@
 - **時機與位置**：**開工模式**與**新增/修改模式**的交付摘要步驟，同步把本輪紀錄 append 到
   `<頁面名>/WORKLOG.md`（無檔則建立），依時間序、每輪一個 entry、**每輪 ≤15 行**——
   記重點不記流水帳，這份紀錄本身也要省 token。
+- **主動執行、格式強制**：寫 WORKLOG 是交付動作的**內建一環，不需使用者提醒、PM 不必知道有此機制**；
+  entry **必須依下方模板**填寫，不得自創格式或省略欄位。
 - **彙整**：設計師收回成果後說「工作報告」（Claude Code 可用 `/work-report`）→ 依
   `.claude/commands/work-report.md` 掃描各頁 WORKLOG 產出總報告；PM 日常不需執行。
 
@@ -136,5 +141,5 @@ entry 模板（兩種模式）：
 ## 環境需求
 
 - Claude Code **或** OpenAI Codex CLI 擇一（Codex 建議以 workspace-write 權限模式執行）
-- Node.js（僅用於 `node --check` 檢查 JS 語法；驗證腳本 `verify.sh` 是純 bash）
+- Node.js（**必裝**：驗證腳本 `verify.js` 與 `node --check` JS 語法檢查皆用；Windows／macOS 皆可執行）
 - **不需要 `npm install`、不需要任何建置工具、不需要 Figma**

@@ -7,7 +7,7 @@
 
 1. 安裝 [Claude Code](https://claude.com/claude-code) 或 [Codex CLI](https://developers.openai.com/codex)（擇一皆可；Codex 建議用 workspace-write 權限模式）
 2. 下載 / clone 這個 repo
-3. （選用）裝 Node.js——只有要對 JS 做語法檢查時用得到；**不需要 `npm install`**
+3. 裝 [Node.js](https://nodejs.org/)——驗證腳本（`verify.js`）與 JS 語法檢查都靠它（Windows／macOS 皆可）；**不需要 `npm install`**
 
 ## 使用（三步驟）
 

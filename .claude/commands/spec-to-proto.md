@@ -42,7 +42,7 @@ $ARGUMENTS
    （元件註解＋react-icons 標註＋variant class）；互動與 mock 遵循 `antd-proto-interactions`，
    **起手先複製其 `assets/` 模板**（toast／modal／demo-radio）再改前綴；
    文案用規格中文；demo 專用控制項一律註記「轉 Figma 時忽略」。
-4. **驗證**：`bash .claude/skills/antd-verify/scripts/verify.sh <頁面資料夾>` 跑到 0 ERROR／判讀 WARN；
+4. **驗證**：`node .claude/skills/antd-verify/scripts/verify.js <頁面資料夾>` 跑到 0 ERROR／判讀 WARN；
    有 JS 加跑 `node --check`。
 5. **交付摘要**（固定格式）：
    - 檔案清單、TODO 清單、沿用／新建元件說明

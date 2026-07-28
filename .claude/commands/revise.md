@@ -22,7 +22,7 @@ $ARGUMENTS
    以「選項確認」發問（執行／取消），PM 選「執行」才動手。
 4. **修改**：切版遵循 `antd-static-layout`、互動與 mock 遵循 `antd-proto-interactions`；
    規格未定義處留 `TODO` 不臆測；只動對應區塊檔案，不重寫整份專案；完整度比照 `examples/` 黃金範例。
-5. **驗證**：`bash .claude/skills/antd-verify/scripts/verify.sh <頁面資料夾>` 跑到 0 ERROR／判讀 WARN；
+5. **驗證**：`node .claude/skills/antd-verify/scripts/verify.js <頁面資料夾>` 跑到 0 ERROR／判讀 WARN；
    動過 JS 加跑 `node --check`。
 6. **交付摘要**（固定格式）：逐條對應意見說明改了什麼、異動檔案清單、驗證結果、剩餘 TODO；
    若有用到 `input/` 參考檔，附註本輪依據了哪些檔。並把本輪紀錄 append 至

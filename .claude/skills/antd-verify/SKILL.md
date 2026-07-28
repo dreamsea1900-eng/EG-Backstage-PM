@@ -10,7 +10,7 @@ description: EG站後台靜態 prototype 每輪修改後的驗證（antd-static-
 
 ## 流程（強制）
 
-1. 執行 `bash .claude/skills/antd-verify/scripts/verify.sh <頁面專案資料夾>`
+1. 執行 `node .claude/skills/antd-verify/scripts/verify.js <頁面專案資料夾>`（跨平台，Windows／macOS 皆可直接跑）
 2. 讀取報告：**ERROR 一律修正**；WARN 逐項判斷，保留者在回報中註記原因
 3. 修正後**重跑**，直到 0 ERROR
 4. 完成人工覆核清單（見下），再向使用者回報驗證摘要
