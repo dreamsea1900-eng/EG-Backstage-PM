@@ -9,6 +9,8 @@
 2. 下載 / clone 這個 repo
 3. 裝 [Node.js](https://nodejs.org/)——驗證腳本（`verify.js`）與 JS 語法檢查都靠它（Windows／macOS 皆可）；**不需要 `npm install`**
 
+> **用 Codex 的 PM**：看 [CODEX-PM操作流程.md](CODEX-PM操作流程.md)——一頁到底、照著做就好。
+
 ## 使用（三步驟）
 
 1. **放檔案**：把這一頁的參考圖、流程圖、規格（`.png` / `.jpg` / `.md`，**幾個檔都行、可混放**）
