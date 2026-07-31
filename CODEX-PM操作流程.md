@@ -13,7 +13,7 @@
 |---|---|---|
 | 1 | 裝 [Codex CLI](https://developers.openai.com/codex) | 終端機打 `codex --version` 有版本號 |
 | 2 | 裝 [Node.js](https://nodejs.org/) | 終端機打 `node -v` 有版本號（AI 的驗證腳本要用；**不用 `npm install`**） |
-| 3 | 把整包 `EG站後台-PM` 放到本機 | 資料夾裡看得到 `AGENTS.md`、`input/`、`examples/` |
+| 3 | 把整包 `EG-Backstage-PM` 放到本機 | 資料夾裡看得到 `AGENTS.md`、`input/`、`examples/` |
 
 ---
 
@@ -29,7 +29,7 @@
 
 ### 步驟 2｜在這個資料夾裡開 Codex
 
-終端機 `cd` 到 `EG站後台-PM`，執行 `codex`。進去後先設兩件事：
+終端機 `cd` 到 `EG-Backstage-PM`，執行 `codex`。進去後先設兩件事：
 
 - 打 `/approvals` → 選**可寫入工作區**（workspace-write）——AI 才有權幫你建檔案
 - 打 `/model` → 選**最高推理檔**——模型能力直接決定產出深度，這裡別省
