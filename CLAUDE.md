@@ -2,5 +2,5 @@
 
 @AGENTS.md
 
-> 規範**單一來源**是 `AGENTS.md`（上行已 import，Claude Code 會自動載入全文）。
-> 要改任何規範請改 `AGENTS.md`，本檔只做入口、不放內容——避免兩份文件漂移。
+> 跨 Agent 的規範與技能都以 `AGENTS.md` 指向的 `agent-resources/` 為單一來源。
+> 本檔只負責載入入口，不維護 Claude 專屬副本。

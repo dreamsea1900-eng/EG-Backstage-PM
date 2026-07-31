@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prototype Boundary"
+  short_description: "Prevent unsupported product and interface invention"
+  default_prompt: "Use the project evidence to define a strict prototype scope without inventing features or UI."

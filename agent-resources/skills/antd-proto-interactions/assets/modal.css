@@ -1,4 +1,4 @@
-/* 【模板】頁內 Modal 樣式(antd-proto-interactions §3):複製到頁面 css/modal.css,xxx 改頁面前綴 */
+/* 【模板】頁內 Modal 樣式:只有 SCOPE.md 明確核准 Modal 時使用,xxx 改頁面前綴 */
 /* 開關以 class 切換(不用 inline style,JS 亦不操作 .style) */
 .xxx-modal {
   display: none;
@@ -8,7 +8,7 @@
   display: block;
 }
 
-/* 寬度依版型調整(表單類慣例 520、單欄選項/置中版型 400–420),置中偏上(antd 預設 top:100px) */
+/* 寬度依 SCOPE/視覺依據調整;未定時保留 TODO,不要用慣例替產品決策 */
 .xxx-modal .ant-modal {
   width: 420px;
   max-width: calc(100vw - 32px);

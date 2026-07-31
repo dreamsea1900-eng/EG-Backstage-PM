@@ -1,54 +1,77 @@
 # EG站後台 PM Prototype Kit
 
-給 PM 用 [Claude Code](https://claude.com/claude-code) 或 [OpenAI Codex](https://developers.openai.com/codex)，把流程圖＋規格直接轉成
-符合 EG站後台設計規範的靜態 HTML prototype 初稿。零 React、零建置、零安裝。
+給 PM／企劃使用的靜態 prototype 工具：把**已經想好的功能、流程與概念**交給 Claude Code、
+OpenAI Codex 或其他 Agent，產出符合 EG站後台設計規範的純 HTML prototype。
 
-## 安裝
+PM 不需要先完成 UI 規格或 API 契約。Agent 會用 kit 內整理好的 EG 既有版型、
+表單與互動慣例補齊呈現；邊界是不能自行增加 PM 沒提到的產品能力與工程邏輯。
 
-1. 安裝 [Claude Code](https://claude.com/claude-code) 或 [Codex CLI](https://developers.openai.com/codex)（擇一皆可；Codex 建議用 workspace-write 權限模式）
-2. 下載 / clone 這個 repo
-3. 裝 [Node.js](https://nodejs.org/)——驗證腳本（`verify.js`）與 JS 語法檢查都靠它（Windows／macOS 皆可）；**不需要 `npm install`**
+## 使用前提
 
-> **用 Codex 的 PM**：看 [CODEX-PM操作流程.md](CODEX-PM操作流程.md)——一頁到底、照著做就好。
+用目前已在使用的 Claude Code、Codex 或其他 Agent 開啟本 repo 即可。這套 kit
+不要求 PM 安裝 Node.js、npm、套件、建置工具或本機伺服器，也不要求 PM 執行終端機指令。
 
-## 使用（三步驟）
+Agent 產出的頁面必須能直接用瀏覽器開啟 `index.html`。樣式與互動只透過
+`<link>`、`<script src>` 引用同一頁面資料夾內的 CSS／vanilla JavaScript；規格明確需要的
+第三方資源才可使用鎖定版本的 CDN 連結。
 
-1. **放檔案**：把這一頁的參考圖、流程圖、規格（`.png` / `.jpg` / `.md`，**幾個檔都行、可混放**）
-   全部丟進 `input/` 資料夾
-2. **打開工具**：把整包 `EG-Backstage-PM` 資料夾拖進 Claude Code；用 Codex 就在這個資料夾開終端機執行 `codex`
-3. **送出一句話**：打「開始」或直接按 Enter——AI 會自動讀 `input/`、先跟你確認理解、
-   把對焦問題**問到清楚為止**；**正式製作前會給你一份規格確認摘要＋大概花多少 token，
-   你點頭才開始**，然後產出 prototype
+Codex PM 可參考 [CODEX-PM操作流程.md](CODEX-PM操作流程.md)。
 
-> `input/` 是「收件匣」，隨時可清空重放；做好的頁面資料夾才是成果，清 `input/` 不影響它。
-> 詳細說明見 `input/README.md`。
+## 做一頁的流程
 
-AI 會依 kit 內建規範自動產出（規範在 `.claude/skills/`；Codex 經 `.agents/skills` 共用同一套）：
-- `<頁面名>/index.html` ＋ `css/` ＋ `js/`（純 HTML/CSS/JS，零 React、零建置）
-- `<頁面名>/WORKLOG.md`（工作紀錄，AI 自動寫；隨頁面資料夾一起交回即可）
-- 交付摘要（檔案清單、TODO 清單、驗收條件對照表、本次依據的 input）
+1. 把同一頁的規格、流程圖、現有頁面截圖與參考資料放入 `input/`。
+2. 若沒有整理好的規格，可複製 [templates/SPEC-TEMPLATE.md](templates/SPEC-TEMPLATE.md) 填寫。
+3. 在此資料夾開啟 Agent，輸入「開始」。
+4. Agent 判斷要展示的功能，並依既有 EG 介面選擇適合的列表、表單、詳情或 Modal 版型。
+5. 只要核心想法清楚就直接製作；版型與欄位排列不會丟回 PM 決定。
+6. 完成後由 Agent 驗證頁面並寫入簡短工作紀錄；PM 不需審核工程報告。
 
-> **品質**：產出會對標 `examples/` 的黃金範例；第一版若不夠到位，說「修改 <頁面>」補 1–2 輪即可。
-> 請用**夠強的模型**跑（Claude Code：Opus／Codex：最高推理檔），模型能力直接影響產出深度。
+## 兩種工作模式
 
-**（進階）** 不放 `input/` 也可以：直接把規格貼進對話框、跟 AI 說「**開工**」，即進入**開工模式**；
-要改已完成的頁面，說「**修改 <頁面名>**」進入**新增/修改模式**。
+### 原型製作（預設）
 
-## 怎麼寫規格，AI 才產得準
+- 直接實作 PM 已描述的功能與想法。
+- 未指定的 UI 呈現依 EG 既有版型補齊。
+- 不加入未提及的產品能力、API 分支或工程例外。
 
-- 用【規格】／【建議】標記：【規格】＝必守；【建議】＝可依規範取捨
-- 講清楚每個畫面的狀態與分支（空狀態、錯誤、載入中都要提）
-- 沒定的文案／API 就寫「待定」，AI 會留 `TODO` 不亂猜
-- **流程圖直接放圖**：截圖丟進 `input/` 請 AI 讀，或用文字描述進規格——兩條路都行
+### 概念探索
 
-## 完成後
+只有 PM 明確說「請幫我發想／提供方案」才啟用。提案會與正式 prototype 分開，
+經 PM 核准後才成為可製作範圍。
 
-把異動交回設計師 review（push 到你 fork 的 repo 開 PR，或把資料夾傳回都行）。
-**設計師 review 通過後才納入正式專案**，接續轉 Figma——這步由設計師處理，PM 不需要碰。
+## 交付內容
 
-## 這個 kit 沒有的東西
+每個頁面資料夾包含：
 
-- 不含既有頁面的實作內容（業務邏輯與設計細節在設計師的正式 repo）
-- 不含 Figma 相關設定——PM 不接觸 Figma
-- 不含 TSX／React 流程——只產靜態 HTML prototype
-- 不需要任何 npm 套件或建置環境
+- 可直接以瀏覽器開啟的 `index.html`
+- 由 HTML 以相對路徑引用的 `css/`、`js/`、`images/`
+- `SCOPE.md`：Agent 自用的簡短防幻想清單，PM 不需簽核
+- `WORKLOG.md`：每輪製作與修改紀錄
+
+## 共用 Agent 資源
+
+所有工具共用 `agent-resources/`：
+
+- `skills/`：邊界、切版、互動、驗證規範
+- `workflows/`：新頁、修改與工作報告流程
+
+`AGENTS.md` 與 `CLAUDE.md` 只負責指向同一份共用資源，不維護工具專屬副本。
+
+## examples 的用途
+
+`examples/` 只用來對標：
+
+- Ant Design DOM 與元件註解
+- CSS／JS 拆檔
+- 技術完成度
+
+不能從 examples 繼承產品功能；版型與表單呈現以 kit 內的 EG 介面參考為準。
+
+## 不包含
+
+- React／TSX 正式前端
+- 真實 API 與後端實作
+- Figma 操作
+- 自動同步正式產品現況的資源庫
+
+正式產品現況資源的更新機制是後續議題，目前不作為本 kit 運作前提。

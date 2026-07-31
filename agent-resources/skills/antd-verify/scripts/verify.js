@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// antd-verify:檢查靜態切版產出是否符合 antd-static-layout 規範(跨平台,Windows/macOS 皆可)
+// antd-verify:檢查靜態切版產出是否符合共用 prototype 規範(跨平台,Windows/macOS 皆可)
 // 用法: node verify.js <頁面專案資料夾>
 'use strict'
 const fs = require('fs')
@@ -95,6 +95,84 @@ function scanSvgHidden() {
   warn += sorted.length
 }
 
+function warnRecords(desc, records) {
+  if (!records.length) return
+  console.log('\n[WARN] ' + desc + '(' + records.length + ' 處)')
+  records.slice(0, 12).forEach(function (record) { console.log('  ' + record) })
+  if (records.length > 12) console.log('  …其餘 ' + (records.length - 12) + ' 處省略')
+  warn += records.length
+}
+
+// type=button 若沒有可供 JS 綁定的識別、disabled 或 inline handler，通常是無行為的死按鈕。
+function scanUnwiredButtons() {
+  const records = []
+  for (const f of filesByExt('.html')) {
+    const html = readLines(f).join('\n')
+    const re = /<button\b([^>]*)>([\s\S]*?)<\/button>/gi
+    let match
+    while ((match = re.exec(html)) !== null) {
+      const attrs = match[1]
+      if (!/\btype=["']button["']/i.test(attrs)) continue
+      if (/\b(id|data-[\w-]+|onclick)=/i.test(attrs) || /\bdisabled\b/i.test(attrs)) continue
+      const text = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() || '(無文字)'
+      const line = html.slice(0, match.index).split('\n').length
+      records.push(f + ':' + line + ':<' + text + '>')
+    }
+  }
+  warnRecords('type=button 可能沒有展示行為(補事件、導覽或 disabled)', records)
+}
+
+function scanNavigationFantasy() {
+  const records = []
+  for (const f of filesByExt('.html')) {
+    const lines = readLines(f)
+    for (let i = 0; i < lines.length; i++) {
+      if (!/\bnav-item\b/.test(lines[i]) || /\bnav-item-active\b/.test(lines[i])) continue
+      records.push(f + ':' + (i + 1) + ':' + lines[i])
+    }
+  }
+  warnRecords('非目前頁的導覽項目需由 PM 或既有畫面證明', records)
+}
+
+function scanFieldSemantics() {
+  const records = []
+  const rules = [
+    { label: '銀行名稱', expected: 'select' },
+    { label: '國碼', expected: 'select' },
+  ]
+  for (const f of filesByExt('.html')) {
+    const html = readLines(f).join('\n')
+    for (const rule of rules) {
+      const labelRe = new RegExp(`<label[^>]*for=["']([^"']+)["'][^>]*>[^<]*${rule.label}[^<]*<\\/label>`, 'i')
+      const labelMatch = html.match(labelRe)
+      if (!labelMatch) continue
+      const id = labelMatch[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const controlRe = new RegExp(`<([a-z0-9-]+)[^>]*id=["']${id}["']`, 'i')
+      const controlMatch = html.match(controlRe)
+      if (controlMatch && controlMatch[1].toLowerCase() !== rule.expected) {
+        const line = html.slice(0, labelMatch.index).split('\n').length
+        records.push(f + ':' + line + ':' + rule.label + ' 使用 <' + controlMatch[1] + '>，EG 既有模式預期 <' + rule.expected + '>')
+      }
+    }
+  }
+  warnRecords('欄位元件與 EG 既有語意不一致', records)
+}
+
+function scanTransactionMinimum() {
+  const records = []
+  for (const f of filesByExt('.html')) {
+    const html = readLines(f).join('\n')
+    const modalStart = html.search(/id=["']transaction-modal["']/i)
+    if (modalStart < 0) continue
+    const modalHtml = html.slice(modalStart)
+    if (!/(確認|送出)/.test(modalHtml)) continue
+    if (/(金額|amount|inputmode=["']decimal["']|type=["']number["'])/i.test(modalHtml)) continue
+    const line = html.slice(0, modalStart).split('\n').length
+    records.push(f + ':' + line + ':交易 Modal 有確認操作，但未找到金額或其他交易內容')
+  }
+  warnRecords('可提交交易缺少最小完整輸入', records)
+}
+
 function pad2(n) { return String(n).padStart(2, '0') }
 const now = new Date()
 console.log('═══ antd-verify ' + now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) + ' ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ' ═══')
@@ -107,9 +185,18 @@ if (!fs.existsSync(path.join(ROOT, 'index.html'))) {
 }
 
 // ---- 結構檢查(antd-static-layout 第1節) ----
-for (const f of ['css/antd.css', 'css/base.css']) {
+for (const f of ['SCOPE.md', 'WORKLOG.md', 'css/antd.css', 'css/base.css']) {
   if (!fs.existsSync(path.join(ROOT, f))) {
     console.log('[ERROR] 缺少 ' + f + '(標準結構,見 antd-static-layout 第1節)')
+    err += 1
+  }
+}
+
+// ---- SCOPE 簡短邊界結構檢查(prototype-boundary) ----
+const scopeLines = readLines(path.join(ROOT, 'SCOPE.md'))
+for (const heading of ['## 要展示的內容', '## 採用的既有版型', '## 展示互動', '## 刻意不加入', '## 展示假設']) {
+  if (!scopeLines.some(function (line) { return line.trim() === heading })) {
+    console.log('[ERROR] SCOPE.md 缺少必要段落: ' + heading)
     err += 1
   }
 }
@@ -144,11 +231,18 @@ scan('WARN', 'HTML 內硬編碼色值(顏色應集中於 css 檔)', /#[0-9a-fA-F
 scan('WARN', 'Tailwind 字級/字重 class(元件文字由 antd.css 負責,版面標籤可例外)', /(^|["' :])(text-(xs|sm|base|lg|xl|2xl)|font-(thin|light|normal|medium|semibold|bold|black))(["' ]|$)/, '.html')
 scan('WARN', '圖片未用 images/ 相對路徑', /<img[^>]*src=/, '.html', /src="(images\/|http|data:)/)
 scan('WARN', 'window.open(「彈窗」一律頁內 Modal,獨立視窗做法已推翻;見 antd-proto-interactions §3/§7)', /window\.open\s*\(/, '.js')
+scan('WARN', '使用持久化或 Demo 控制(通常不應出現在 PM prototype)', /(localStorage|sessionStorage|重設 Demo|Demo：)/, '.js')
+scan('WARN', 'HTML 含 Demo 控制(通常不應出現在 PM prototype)', /(重設 Demo|Demo：)/, '.html')
+scan('WARN', '背景副作用被顯示在介面(確認是否真的影響操作者判斷)', /(成功後|送出後|儲存後).*(Log|歷程|報表|API|開分洗分|回滾|補償)/i, '.html')
 scanSvgHidden()
+scanUnwiredButtons()
+scanNavigationFantasy()
+scanFieldSemantics()
+scanTransactionMinimum()
 
 console.log('')
 console.log('── 結果: ERROR ' + err + ' 處 / WARN ' + warn + ' 處 ──')
-console.log('ℹ 靜態人工覆核:元件註解(名稱+關鍵props)齊全、DOM 對應 antd5 實際結構、彈出層位於 </body> 前、本輪僅動對應區塊檔案')
+console.log('ℹ 人工覆核:符合 PM 展示意圖與 EG 既有版型、無額外產品邏輯、元件註解齊全、DOM 對應 antd5、彈出層位於 </body> 前')
 if (err > 0) {
   console.log('✗ 未通過:ERROR 必須修正後重跑')
   process.exit(1)

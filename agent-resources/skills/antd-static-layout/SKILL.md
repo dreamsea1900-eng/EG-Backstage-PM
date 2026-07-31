@@ -8,9 +8,24 @@ description: 以純 HTML/CSS/JS(不引入 React)搭配 Ant Design 5 靜態樣式
 目的:產出「外觀 100% 等同 Ant Design 5、但執行階段零 React 依賴」的靜態網頁,
 且檔案拆分到讓後續修改只需讀取小檔案,不必讀整份專案。
 
+## 0. 需求邊界優先（強制）
+
+本 skill 負責把 PM 已描述的功能與想法，轉成符合既有 EG 後台習慣的展示介面。
+開始前必須先讀：
+
+1. `../prototype-boundary/SKILL.md`
+2. [references/eg-interface-patterns.md](references/eg-interface-patterns.md)
+
+- 既有 EG 慣例可以決定版型、元件、欄位排列與操作位置。
+- PM 的描述決定功能、欄位與流程；版型參考不能增加新的產品能力。
+- PM 未指定呈現方式時，直接選擇最接近的既有版型，不要求 PM 補 UI 規格。
+- API、資料庫與工程實作不是切版輸入，也不是開工門檻。
+
 ## 1. 檔案結構(強制)
 
 - HTML、CSS、JS 一律拆成獨立檔案。禁止 inline style 與 inline script。
+- 成果不得依賴 build 或本機 server，PM 必須能直接用瀏覽器開啟 `index.html`。
+- CSS 以 `<link>`、vanilla JavaScript 以 `<script src>` 載入；所有本機資源使用相對路徑。
 - CSS 與 JS **依頁面區塊拆多支**(header.css、form.css、header.js、form.js …),
   一個區塊一組檔案。後續修改哪個區塊,就只動那個區塊的檔案。
 - 圖片一律放 `images/`,以相對路徑引用。
@@ -19,6 +34,8 @@ description: 以純 HTML/CSS/JS(不引入 React)搭配 Ant Design 5 靜態樣式
 ```
 project/
 ├── index.html
+├── SCOPE.md          ← Agent 自用的簡短原型邊界
+├── WORKLOG.md        ← 每輪製作／修改紀錄
 ├── css/
 │   ├── antd.css        ← 由本 skill 的 assets/antd.css 直接複製
 │   ├── base.css        ← 全域字型、頁面底色等最小設定
@@ -71,6 +88,8 @@ tailwind.config = {
 ## 3. 技術分工(強制)
 
 - **不引入 React、不引入 antd 的 JS**。頁面是純 HTML/CSS/vanilla JS。
+- **不要求 PM 安裝 Node.js、npm、套件或執行終端機指令**。Node 驗證腳本只供
+  Agent 在自身執行環境做品質檢查，不是頁面依賴。
 - **Tailwind 只負責排版與間距**:flex、grid、gap、margin、padding、寬高。
   元件外觀(顏色、圓角、字級、陰影、邊框)一律交給 antd.css,
   禁止用 Tailwind 的顏色/圓角/陰影 class 蓋在 ant-* 元件上。
@@ -146,6 +165,7 @@ antd 升版或改主題色屬設計師維護範圍,PM 不處理(主題維持 ant
 
 ## 7. 修改原則
 
+- 先讀 `SCOPE.md`;使用者本輪要求若改變展示內容，直接同步更新。
 - 後續修改只調整對應區塊的 html 片段 / css / js 檔,不重寫整份專案、
   不重新輸出未變動的檔案。
 - 新增區塊 = 新增一組同名的 css + js 檔,並在 index.html 的 head 依序掛上。

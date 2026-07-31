@@ -1,4 +1,4 @@
-/* 【模板】message toast 控制器(antd-proto-interactions §6)
+/* 【模板】message toast 控制器(只有 SCOPE.md 明確核准 toast 時使用)
    使用方式:複製到頁面 js/toast.js,將 Xxx/xxx 前綴改為頁面前綴(如 Tpb/tpb);
    刪減型別時 TYPES 與 toast.html 的 notice 區塊要同步刪。
    XxxToast.show(type, text, duration):text null 沿用 HTML 預設文案;

@@ -1,4 +1,4 @@
-/* 【模板】toast 樣式(antd-proto-interactions §6):複製到頁面 css/toast.css,xxx 改頁面前綴 */
+/* 【模板】toast 樣式:只有 SCOPE.md 明確核准 toast 時使用,xxx 改頁面前綴 */
 /* Toast 顯示位置(靜態版簡化:固定頂部置中) */
 .xxx-toast {
   display: none;

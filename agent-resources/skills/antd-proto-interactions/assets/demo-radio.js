@@ -1,4 +1,5 @@
-/* 【模板】demo Radio checked class 同步(antd-proto-interactions §4)
+/* 【選用模板】demo Radio checked class 同步
+   只有 SCOPE.md 明確核准 Demo 控制時才能使用;
    併入 demo 區所屬區塊的 js 檔(非獨立檔),xxx 改頁面前綴;
    讀取選中值:document.querySelector('#xxxDemoGroup .ant-radio-input:checked').value */
 
